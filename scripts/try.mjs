@@ -18,7 +18,7 @@ page.on('console', (m) => m.type() === 'error' && console.log('page error:', m.t
 page.on('pageerror', (e) => console.log('page exception:', e.message));
 await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 }).catch((e) => console.log('goto:', e.message));
 for (let i = 0; i < 3; i++) await page.mouse.wheel({ deltaY: 2500 }), await new Promise((r) => setTimeout(r, 1500));
-await page.evaluate(() => scrollTo(0, 0));
+await page.evaluate(() => (document.querySelector('.tn-collapsed') ?? document.body).scrollIntoView({ block: 'center' }));
 await new Promise((r) => setTimeout(r, 1000));
 console.log(await page.evaluate(() => ({
   path: location.pathname,

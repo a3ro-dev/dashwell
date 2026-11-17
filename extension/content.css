@@ -16,11 +16,11 @@ aside div:has(> div > div > [id^="aditude"]) {
 article.tn-collapsed > :not(.tn-bar, .tn-why) { display: none !important; }
 .tn-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 16px; font-size: 14px; opacity: 0.75;
+  padding: 10px 16px; font-size: 14px; line-height: 1.4 !important; opacity: 0.75;
 }
 .tn-bar button {
   font: inherit; color: inherit; background: none; border: 1px solid currentColor;
-  border-radius: 999px; padding: 2px 12px; cursor: pointer;
+  border-radius: 999px; padding: 2px 12px; line-height: 1.4 !important; cursor: pointer;
 }
 article.tn-favorite { box-shadow: 0 0 0 2px #00b8ff; }
 
