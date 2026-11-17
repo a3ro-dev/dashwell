@@ -1,0 +1,30 @@
+Dashwell
+Copyright 2026 Akshat Singh Kushwaha (a3ro-dev)
+
+Dashwell's own source code is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Dashwell is an independent project. It is not affiliated with, endorsed by or sponsored by
+Tumblr or Automattic Inc. "Tumblr" is a trademark of Automattic Inc., used here only to say
+which website Dashwell works with.
+
+Third-party material shipped with Dashwell
+------------------------------------------
+
+The ad-blocking data files extension/rules/ads.json and extension/cosmetic.css are generated
+by scripts/build-filters.mjs from these filter lists, and remain under their licences:
+
+  EasyList (https://easylist.to), by The EasyList authors.
+    Licensed under GPLv3 (https://www.gnu.org/licenses/gpl-3.0.html)
+    or Creative Commons Attribution-ShareAlike 3.0 (https://creativecommons.org/licenses/by-sa/3.0/).
+
+  AdGuard Base filter (https://github.com/AdguardTeam/AdGuardFilters), by AdGuard Software Ltd.
+    Licensed under GPLv3 (https://github.com/AdguardTeam/AdguardFilters/blob/master/LICENSE).
+
+They are separate data files distributed alongside Dashwell (an aggregate), not part of its
+code. Their source is the published lists above; regenerate them with `npm run build`.
+
+Used at build time only (not shipped):
+  adblock-rs (https://github.com/brave/adblock-rust), Mozilla Public License 2.0.
+
+The Android app links AndroidX WebKit (https://developer.android.com/jetpack/androidx/releases/webkit),
+Apache License 2.0, Copyright The Android Open Source Project.
