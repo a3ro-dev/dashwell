@@ -11,12 +11,18 @@
     small { opacity: .6; }
     .bar { height: 4px; background: #00b8ff; border-radius: 2px; margin-top: 2px; }
     form { display: flex; gap: 6px; }
-    input { flex: 1; font: inherit; padding: 4px 8px; border-radius: 6px; border: 0; }
+    label { line-height: 1.8; cursor: pointer; }
+    form input { flex: 1; font: inherit; padding: 4px 8px; border-radius: 6px; border: 0; }
     button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 0; cursor: pointer; }
     .chip { display: inline-block; margin: 3px 4px 0 0; padding: 1px 8px; border-radius: 999px; background: #ffffff1a; cursor: pointer; }
   </style>
 </head>
 <body>
+  <h2>Options</h2>
+  <label><input type="checkbox" id="hidePremium"> Hide "Go Premium" / "Go Ad-Free" buttons</label><br>
+  <label><input type="checkbox" id="showAlgo"> Show the algorithm (reasons on posts + live panel)</label><br>
+  <label><input type="checkbox" id="shapeFeed"> Collapse over-repeated topics</label>
+
   <h2>New from your favorites</h2>
   <ul id="unread"><li><small>Nothing new.</small></li></ul>
   <p><button id="read">Mark all read</button> <button id="refresh">Check now</button></p>

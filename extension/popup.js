@@ -57,6 +57,17 @@ $('read').onclick = async () => {
   $('unread').replaceChildren(el('li', 'Nothing new.'));
 };
 
+const DEFAULTS = { hidePremium: true, showAlgo: true, shapeFeed: true };
+chrome.storage.local.get({ settings: {} }).then(({ settings }) => {
+  for (const key in DEFAULTS) {
+    $(key).checked = settings[key] ?? DEFAULTS[key];
+    $(key).onchange = async () => {
+      const { settings: cur } = await chrome.storage.local.get({ settings: {} });
+      chrome.storage.local.set({ settings: { ...DEFAULTS, ...cur, [key]: $(key).checked } });
+    };
+  }
+});
+
 $('refresh').onclick = () => chrome.runtime.sendMessage('check');
 chrome.storage.onChanged.addListener(draw);
 draw();
