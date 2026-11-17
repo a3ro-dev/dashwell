@@ -3,12 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashwell</title>
   <style>
+    /* A plain settings page in Tumblr's own dark greys: grouped rows, one blue for switches. */
     :root {
-      --ground: #001935; /* Tumblr navy */
-      --ink: #ffffff;
-      --ink-2: #b9c6d4; /* secondary text, tinted from the navy */
-      --line: #ffffff1f;
+      --ground: #101010;
+      --group: #1e1e1e;
+      --ink: #f5f5f5;
+      --ink-2: #a8a8a8;
+      --line: #2e2e2e;
       --accent: #00b8ff;
       --danger: #ff6b55;
       color-scheme: dark;
@@ -17,84 +20,110 @@
     body {
       width: 360px;
       margin: 0;
-      padding: 16px 20px 24px;
+      padding: 20px 16px 28px;
       font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       background: var(--ground);
       color: var(--ink);
     }
-    h1 { margin: 0 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
-    .lede { margin: 0; color: var(--ink-2); }
-    h2 { margin: 28px 0 8px; font-size: 17px; font-weight: 700; }
+    header { padding: 0 4px; }
+    h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.015em; }
+    .lede { margin: 2px 0 0; color: var(--ink-2); }
+    h2 { margin: 28px 4px 8px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+    p { margin: 0; }
     a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; text-underline-offset: 3px; }
     ul { list-style: none; margin: 0; padding: 0; }
-    .post { padding: 10px 0; border-bottom: 1px solid var(--line); }
-    .post a { display: block; color: var(--ink); font-weight: 600; }
+
+    .group { background: var(--group); border-radius: 14px; overflow: hidden; }
+    .group:not(.pad) > * + * { border-top: 1px solid var(--line); }
+    .pad { padding: 14px 16px; }
+
+    .post { display: block; padding: 12px 16px; color: var(--ink); }
+    .post:hover { background: #ffffff08; }
+    .post strong { display: block; font-weight: 600; }
     .post small { color: var(--ink-2); font-size: 13px; }
-    .empty { margin: 0; color: var(--ink-2); }
-    .update { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: #00b8ff1f; }
+    #unread li + li { border-top: 1px solid var(--line); }
+    .quiet { color: var(--ink-2); }
+    .linkish { padding: 0 12px 0 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; min-height: 32px; }
+    .linkish[hidden] { display: none; }
+
+    .update { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 16px; border-radius: 14px; background: #0a2a38; }
     .update[hidden] { display: none; }
     .update span { flex: 1; }
-    .row {
-      display: flex; align-items: center; gap: 16px;
-      min-height: 56px; padding: 8px 0; border-bottom: 1px solid var(--line); cursor: pointer;
-    }
+
+    .row { display: flex; align-items: center; gap: 16px; min-height: 60px; padding: 10px 16px; cursor: pointer; }
     .row span { flex: 1; }
     .row small { display: block; color: var(--ink-2); font-size: 13px; }
-    .row input { appearance: none; flex: none; width: 44px; height: 26px; margin: 0; border-radius: 13px; background: #ffffff33; position: relative; cursor: pointer; transition: background-color 150ms ease-out; }
-    .row input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 150ms ease-out; }
+    .row input { appearance: none; flex: none; width: 46px; height: 28px; margin: 0; border-radius: 14px; background: #3a3a3a; position: relative; cursor: pointer; transition: background-color 160ms ease-out; }
+    .row input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0006; transition: transform 160ms ease-out; }
     .row input:checked { background: var(--accent); }
     .row input:checked::after { transform: translateX(18px); }
     @media (prefers-reduced-motion: reduce) { .row input, .row input::after { transition: none; } }
-    input:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-    .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 16px; background: #ffffff14; color: var(--ink); font: inherit; font-size: 14px; border: 0; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 16px; background: #2c2c2c; color: var(--ink); font: inherit; font-size: 14px; border: 0; }
     button.chip { cursor: pointer; }
-    button.chip:hover { background: #ffffff24; }
-    form { display: flex; gap: 8px; margin-top: 12px; }
-    form input { flex: 1; min-width: 0; min-height: 40px; padding: 0 12px; border: 1px solid #ffffff33; border-radius: 10px; background: #ffffff0d; color: var(--ink); font: inherit; }
-    form input::placeholder { color: var(--ink-2); }
-    .btn { min-height: 40px; padding: 0 16px; border: 0; border-radius: 20px; background: #ffffff1a; color: var(--ink); font: inherit; font-weight: 700; cursor: pointer; }
-    .btn:hover { background: #ffffff29; }
-    .btn.primary { background: var(--accent); color: #001935; }
-    .actions { display: flex; gap: 8px; margin-top: 12px; }
-    .danger { margin-top: 32px; padding: 0; min-height: 40px; border: 0; background: none; color: var(--danger); font: inherit; cursor: pointer; }
-    .hint { margin: 8px 0 0; color: var(--ink-2); font-size: 13px; }
-    .version { margin: 8px 0 0; color: var(--ink-2); font-size: 13px; }
+    button.chip:hover { background: #383838; }
+    form { display: flex; gap: 8px; }
+    .field { flex: 1; min-width: 0; min-height: 42px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 10px; background: #141414; color: var(--ink); font: inherit; }
+    textarea.field { display: block; width: 100%; min-height: 84px; padding: 10px 12px; resize: vertical; }
+    .field::placeholder { color: var(--ink-2); }
+    .btn { display: inline-grid; place-items: center; min-height: 42px; padding: 0 18px; border: 0; border-radius: 21px; background: var(--accent); color: #001b26; font: inherit; font-weight: 700; cursor: pointer; }
+    .hint { margin-top: 10px; color: var(--ink-2); font-size: 13px; }
+    .stack > * + * { margin-top: 12px; }
+
+    footer { margin-top: 28px; padding: 0 4px; color: var(--ink-2); font-size: 13px; }
+    footer p + p { margin-top: 10px; }
+    #interests { font-size: 15px; color: var(--ink); }
+    .danger { padding: 0; min-height: 32px; border: 0; background: none; color: var(--danger); font: inherit; font-size: 15px; cursor: pointer; }
   </style>
 </head>
 <body>
-  <h1>tumblr-new</h1>
-  <p class="lede">Ads are blocked. Your feed stays varied.</p>
+  <header>
+    <h1>Dashwell</h1>
+    <p class="lede">Ads blocked, feed kept varied, mutuals never missed.</p>
+  </header>
+
   <div class="update" id="update" hidden>
     <span id="update-text"></span>
-    <a class="btn primary" id="update-link" href="#" target="_blank" rel="noopener">Get it</a>
+    <a class="btn" id="update-link" href="#" target="_blank" rel="noopener">Update</a>
   </div>
 
   <h2>New from your favorites</h2>
-  <ul id="unread"><li><p class="empty">Nothing new yet.</p></li></ul>
-  <div class="actions">
-    <button class="btn" id="refresh" type="button">Check now</button>
-    <button class="btn" id="read" type="button">Mark all as read</button>
+  <div class="group">
+    <ul id="unread"></ul>
+    <div class="pad"><button class="linkish" id="refresh" type="button">Check again</button><button class="linkish" id="read" type="button" hidden>Mark all as read</button></div>
   </div>
 
-  <h2>Your feed</h2>
-  <label class="row"><span>Keep my feed varied<small>Fold away posts on a topic you've seen a lot of lately</small></span><input type="checkbox" id="shapeFeed"></label>
-  <label class="row"><span>Hide "Go Premium"<small>Remove Tumblr's upgrade buttons</small></span><input type="checkbox" id="hidePremium"></label>
+  <h2>Feed</h2>
+  <div class="group">
+    <label class="row"><span>Keep my feed varied<small>Fold away a topic you've seen a lot of lately</small></span><input type="checkbox" id="shapeFeed"></label>
+    <label class="row"><span>Hide Tumblr's suggestions<small>No "Check out these communities" in your feed</small></span><input type="checkbox" id="hideSuggestions"></label>
+    <label class="row"><span>Open Following first<small>Start on your chronological feed</small></span><input type="checkbox" id="followingFirst"></label>
+    <label class="row"><span>Hide "Go Premium"<small>Remove the upgrade buttons</small></span><input type="checkbox" id="hidePremium"></label>
+  </div>
 
   <h2>Favorite blogs</h2>
-  <div class="chips" id="favs"></div>
-  <form id="pin">
-    <input id="blog" placeholder="Add a blog, like staff" aria-label="Blog to add to favorites" autocomplete="off" autocapitalize="off">
-    <button class="btn primary">Add</button>
-  </form>
-  <p class="hint">Favorites are never folded away. Blogs you like a lot get added for you.</p>
+  <div class="group pad stack">
+    <div class="chips" id="favs"></div>
+    <form id="pin">
+      <input class="field" id="blog" placeholder="Add a blog, like staff" aria-label="Blog to add to favorites" autocomplete="off" autocapitalize="off">
+      <button class="btn">Add</button>
+    </form>
+    <p class="hint">Favorites are never folded away. Blogs you like a lot are added for you.</p>
+  </div>
 
-  <h2>What it's learned you like</h2>
-  <div class="chips" id="interests"></div>
+  <h2>Muted</h2>
+  <div class="group pad">
+    <textarea class="field" id="mutes" rows="3" placeholder="One per line: a word, a #tag or a @blog" aria-label="Muted words, tags and blogs" autocapitalize="off" spellcheck="false"></textarea>
+    <p class="hint">Muted posts fold into one line you can still open. A muted @blog is caught inside other people's reblogs too.</p>
+  </div>
 
-  <button class="danger" id="reset" type="button">Start over</button>
-  <p class="version" id="version"></p>
+  <footer>
+    <p id="interests"></p>
+    <p><button class="danger" id="reset" type="button">Start over</button></p>
+    <p id="version"></p>
+  </footer>
 
   <script src="feed.js"></script>
   <script src="popup.js"></script>

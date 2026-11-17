@@ -2,8 +2,8 @@
 const T = globalThis.TumblrNew;
 const $ = (id) => document.getElementById(id);
 const el = (tag, text, props = {}) => Object.assign(document.createElement(tag), { textContent: text, ...props });
-const DEFAULTS = { hidePremium: true, shapeFeed: true };
-const RELEASES = 'https://api.github.com/repos/a3ro-dev/tumblr-new/releases/latest';
+const DEFAULTS = { hidePremium: true, shapeFeed: true, hideSuggestions: true, followingFirst: false };
+const RELEASES = 'https://api.github.com/repos/a3ro-dev/dashwell/releases/latest';
 const IS_APP = !!globalThis.__tnAppVersion;
 
 // In the app, links open in the phone's browser instead of replacing the sheet.
@@ -19,12 +19,6 @@ const ago = (t) => {
   return `${Math.round(m / 1440)} days ago`;
 };
 
-function emptyItem(text) {
-  const li = el('li', '');
-  li.append(el('p', text, { className: 'empty' }));
-  return li;
-}
-
 async function draw() {
   const s = await chrome.storage.local.get({ engine: null, pinned: [], unread: [], settings: {} });
   const now = Date.now();
@@ -33,14 +27,16 @@ async function draw() {
   $('unread').replaceChildren(
     ...(s.unread.length
       ? s.unread.map((p) => {
-          const li = el('li', '', { className: 'post' });
-          const a = el('a', p.title, { href: p.link });
+          const li = el('li', '');
+          const a = el('a', '', { href: p.link, className: 'post' });
+          a.append(el('strong', p.title), el('small', `@${p.blog} · ${ago(p.time)}`));
           a.onclick = (e) => (e.preventDefault(), open(p.link));
-          li.append(a, el('small', `@${p.blog} · ${ago(p.time)}`));
+          li.append(a);
           return li;
         })
-      : [emptyItem('Nothing new yet.')]),
+      : [el('li', 'Nothing new from your favorites right now.', { className: 'pad quiet' })]),
   );
+  $('read').hidden = !s.unread.length;
 
   for (const key in DEFAULTS) $(key).checked = s.settings[key] ?? DEFAULTS[key];
 
@@ -57,15 +53,14 @@ async function draw() {
           chip.onclick = () => chrome.storage.local.set({ pinned: s.pinned.filter((v) => v !== b) });
           return chip;
         })
-      : [el('p', 'None yet.', { className: 'empty' })]),
+      : [el('p', 'None yet.', { className: 'quiet' })]),
   );
 
-  const top = T.topInterests(engine, now, 12);
-  $('interests').replaceChildren(
-    ...(top.length
-      ? top.map(({ tag }) => el('span', `#${tag}`, { className: 'chip' }))
-      : [el('p', 'Like or reblog a few posts and this fills in.', { className: 'empty' })]),
-  );
+  // What it noticed, as a sentence rather than a chart.
+  const top = T.topInterests(engine, now, 3).map(({ tag }) => `#${tag}`);
+  $('interests').textContent = top.length
+    ? `Lately you've been into ${top.length > 1 ? `${top.slice(0, -1).join(', ')} and ${top.at(-1)}` : top[0]}.`
+    : 'Like or reblog a few posts and Dashwell learns what you enjoy.';
 }
 
 for (const key in DEFAULTS) {
@@ -89,6 +84,13 @@ $('pin').onsubmit = async (e) => {
   input.value = '';
   chrome.runtime.sendMessage('check');
 };
+chrome.storage.local.get({ mutes: '' }).then(({ mutes }) => ($('mutes').value = mutes));
+let muteTimer;
+$('mutes').oninput = () => {
+  clearTimeout(muteTimer);
+  muteTimer = setTimeout(() => chrome.storage.local.set({ mutes: $('mutes').value }), 400);
+};
+
 $('blog').oninput = () => $('blog').setCustomValidity('');
 
 $('read').onclick = async () => {
@@ -101,7 +103,7 @@ $('read').onclick = async () => {
 $('refresh').onclick = () => chrome.runtime.sendMessage('check');
 
 $('reset').onclick = async () => {
-  if (!confirm('Forget everything it learned about what you like? Your favorite blogs stay.')) return;
+  if (!confirm('Forget what Dashwell learned about what you like? Your favorites and mutes stay.')) return;
   await chrome.storage.local.remove(['engine', 'unread', 'lastSeen']);
   await chrome.action.setBadgeText({ text: '' });
   draw();
@@ -116,7 +118,7 @@ const newer = (a, b) => {
 };
 async function checkUpdate() {
   const current = IS_APP ? globalThis.__tnAppVersion : chrome.runtime.getManifest().version;
-  $('version').textContent = `Version ${current}`;
+  $('version').textContent = `Dashwell ${current}`;
   try {
     const r = await fetch(RELEASES, { headers: { Accept: 'application/vnd.github+json' } });
     if (!r.ok) return;
