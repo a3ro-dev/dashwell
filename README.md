@@ -5,7 +5,7 @@
 Your Tumblr dashboard, done well. A browser extension and an Android app that fix what people complain about most, with no Tumblr API key and nothing leaving your device.
 
 <p>
-  <img src="assets/screenshot-feed.png" width="270" alt="A Tumblr post folded into one line: Giving #billy maximoff a rest for a bit, with a Show button">
+  <img src="assets/feed.jpg" width="270" alt="A Tumblr feed where the third #visionquest post in a row is folded into one line: you've seen a lot of #visionquest lately, with a show button">
   <img src="assets/screenshot-settings.png" width="270" alt="Dashwell settings: new posts from favorites, feed switches, favorite blogs, muted words">
 </p>
 
@@ -37,3 +37,7 @@ Your Tumblr dashboard, done well. A browser extension and an Android app that fi
 - `npm install` (builds adblock-rs; needs a Rust toolchain), `npm run build` regenerates the ad rules and cosmetic CSS, `npm test` runs the engine tests.
 - Android: `cd android && ./gradlew assembleRelease` (the app ships `extension/` as its assets, so both stay in sync).
 - `CHROME=<chrome-for-testing> node scripts/try.mjs [url]` loads the extension in a real browser and reports what it did.
+
+## Credits
+
+Made by **a3ro-dev** ([a3ro.dev](https://a3ro.dev), [github](https://github.com/a3ro-dev)). Site: [a3ro-dev.github.io/dashwell](https://a3ro-dev.github.io/dashwell/). Licence: [Apache-2.0](LICENSE); filter-list data under its own licences, see [NOTICE](NOTICE). Not affiliated with Tumblr or Automattic.

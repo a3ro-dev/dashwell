@@ -396,7 +396,7 @@ public class MainActivity extends Activity {
                     if (h.equals("tumblr.com") || h.endsWith(".tumblr.com")) {
                         if (sheet != null) sheet.dismiss();
                         web.loadUrl(u.toString()); // a favorite's post: open it right here
-                    } else if (h.equals("github.com") || h.endsWith(".githubusercontent.com")) {
+                    } else if (h.equals("github.com") || h.endsWith(".githubusercontent.com") || h.equals("a3ro.dev")) {
                         startActivity(new Intent(Intent.ACTION_VIEW, u)); // update download
                     }
                     respond(reply, id, null);

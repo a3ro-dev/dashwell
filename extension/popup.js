@@ -134,6 +134,8 @@ async function checkUpdate() {
   } catch {} // offline: try again next time the sheet opens
 }
 
+$('credit').onclick = (e) => (e.preventDefault(), open('https://a3ro.dev'));
+
 chrome.storage.onChanged.addListener(draw);
 draw();
 checkUpdate();
