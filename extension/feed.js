@@ -28,7 +28,7 @@
   const WEIGHTS = { like: 1, reblog: 2.2, comment: 2.5, expand: 1.2 };
   const META = new Set(['reblog', 'reblogs', 'mine', 'queued', 'queue', 'long post', 'fy', 'fyp', 'personal', 'text', 'photo', 'video', 'tumblr', 'repost']);
   // matched against `tag + ' '`, so "sob" catches "#sob" but not "#sobriety"
-  const COMMENTARY = /^(i|im|i'm|my|me|you|we|he|she|they|this|that|wait|omg|lol|literally|screaming|crying|sob|help|op|bro|guys|also|anyway|update|real|mood|same) /;
+  const COMMENTARY = /^(i|im|i'm|my|me|you|we|he|she|they|his|her|their|our|its|it's|this|that|so|just|not|no|yes|oh|ok|okay|why|what|how|wait|omg|lol|literally|screaming|crying|sob|help|op|bro|guys|also|anyway|update|real|mood|same) /;
   const NO_STEM = new Set(['series', 'species', 'news', 'glasses', 'aesthetics', 'physics', 'mathematics', 'pokemon']);
 
   const half = (dt, hlMs) => 0.5 ** (dt / hlMs);
@@ -255,8 +255,9 @@
       const why = pinned.includes(post.blog) ? 'pinned' : `tie ${tie.toFixed(1)}`;
       return shown({ action: 'favorite', reason: `mutual fast-lane: @${post.blog} (${why}, ${authorCount + 1}/${P.MUTUAL_BURST} mutual slots)` }, clustersOf(p, post, now), false);
     }
-    if (dup) return { action: 'collapse', reason: 'collapsed: reblog of a post you already saw', clusters: [] };
-    if (authorCount >= P.AUTHOR_CAP) return { action: 'collapse', reason: `collapsed: @${post.blog} used ${authorCount}/${P.AUTHOR_CAP} recent author slots`, clusters: [] };
+    if (dup) return { action: 'collapse', reason: 'collapsed: reblog of a post you already saw', say: 'You already saw this post', clusters: [] };
+    if (authorCount >= P.AUTHOR_CAP)
+      return { action: 'collapse', reason: `collapsed: @${post.blog} used ${authorCount}/${P.AUTHOR_CAP} recent author slots`, say: `More from @${post.blog} than everyone else lately`, tag: post.blog, clusters: [] };
 
     const clusters = clustersOf(p, post, now);
     if (!clusters.length) return shown({ action: 'show', reason: `shown: no topic tags (@${post.blog} ${authorCount + 1}/${P.AUTHOR_CAP} author slots)` }, [], false);
@@ -278,8 +279,10 @@
     return {
       action: 'collapse',
       reason: cooling
-        ? `collapsed: cooling down ${label(crowded)} this session (${used(crowded)}/${quota(crowded)} slots)`
+        ? `collapsed: cooling down ${label(crowded)} (${used(crowded)} shown recently, limit ${quota(crowded)} while it cools)`
         : `collapsed: ${label(crowded)} used ${used(crowded)}/${quota(crowded)} of its recent slots`,
+      say: cooling ? `Giving ${label(crowded)} a rest for a bit` : `You've seen a lot of ${label(crowded)} lately`,
+      tag: crowded,
       clusters,
     };
   }
