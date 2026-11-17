@@ -112,6 +112,14 @@ public class MainActivity extends Activity {
         web.loadUrl(link != null && "www.tumblr.com".equals(link.getHost()) ? link.toString() : HOME);
     }
 
+    // WebView writes cookies to disk lazily; flush whenever we leave the foreground so a
+    // fresh login survives the app being killed (and every update installed over it).
+    @Override
+    protected void onPause() {
+        super.onPause();
+        CookieManager.getInstance().flush();
+    }
+
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);

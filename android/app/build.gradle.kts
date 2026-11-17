@@ -7,8 +7,8 @@ android {
         applicationId = "dev.a3ro.dashwell"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.1.1"
     }
     // The extension is the single source of truth: its files ship as app assets.
     sourceSets["main"].assets.srcDirs("src/main/assets", "../../extension")
@@ -24,6 +24,8 @@ android {
         }
     }
     buildTypes {
+        // Debug builds get their own ID so they never collide with (and force uninstalling) the release.
+        debug { applicationIdSuffix = ".debug" }
         release {
             isMinifyEnabled = false
             if (ks != null) signingConfig = signingConfigs.getByName("release")
