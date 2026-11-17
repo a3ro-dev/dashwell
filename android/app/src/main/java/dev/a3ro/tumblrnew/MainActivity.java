@@ -51,7 +51,7 @@ import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 /**
- * tumblr-new for Android: tumblr.com in a WebView with the extension's scripts injected,
+ * Dashwell for Android: tumblr.com in a WebView with the extension's scripts injected,
  * ads blocked at the network layer, and the extension popup reused as a settings sheet.
  */
 public class MainActivity extends Activity {
@@ -82,7 +82,7 @@ public class MainActivity extends Activity {
         WebView.setWebContentsDebuggingEnabled((getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0);
 
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.parseColor("#001935"));
+        root.setBackgroundColor(Color.parseColor("#0d0d0d")); // Tumblr header colour, so the status bar strip blends in
         // targetSdk 35+ draws edge-to-edge: keep content clear of the status and navigation bars.
         root.setOnApplyWindowInsetsListener((v, insets) -> {
             if (Build.VERSION.SDK_INT >= 30) {
@@ -230,7 +230,7 @@ public class MainActivity extends Activity {
         if (now - prefs.getLong("checked", 0) < 24L * 3600 * 1000) return;
         HttpURLConnection c = null;
         try {
-            c = (HttpURLConnection) new URL("https://api.github.com/repos/a3ro-dev/tumblr-new/releases/latest").openConnection();
+            c = (HttpURLConnection) new URL("https://api.github.com/repos/a3ro-dev/dashwell/releases/latest").openConnection();
             c.setConnectTimeout(10000);
             c.setReadTimeout(10000);
             c.setRequestProperty("Accept", "application/vnd.github+json");

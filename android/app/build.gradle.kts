@@ -4,11 +4,11 @@ android {
     namespace = "dev.a3ro.tumblrnew"
     compileSdk = 36
     defaultConfig {
-        applicationId = "dev.a3ro.tumblrnew"
+        applicationId = "dev.a3ro.dashwell"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
     // The extension is the single source of truth: its files ship as app assets.
     sourceSets["main"].assets.srcDirs("src/main/assets", "../../extension")
@@ -19,7 +19,7 @@ android {
         if (ks != null) create("release") {
             storeFile = file(ks)
             storePassword = providers.gradleProperty("TN_KEYSTORE_PASSWORD").get()
-            keyAlias = "tumblr-new"
+            keyAlias = "dashwell"
             keyPassword = providers.gradleProperty("TN_KEYSTORE_PASSWORD").get()
         }
     }

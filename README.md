@@ -1,38 +1,39 @@
 <img src="assets/icon.svg" width="64" height="64" alt="">
 
-# tumblr-new
+# Dashwell
 
-A browser extension that fixes the three things everyone complains about on Tumblr. No API key needed.
+Your Tumblr dashboard, done well. A browser extension and an Android app that fix what people complain about most, with no Tumblr API key and nothing leaving your device.
 
-- **No ads.** [adblock-rs](https://www.npmjs.com/package/adblock-rs) compiles EasyList + AdGuard into static block rules and Tumblr cosmetic CSS at build time. Sponsored posts are also hidden by stable markers.
-- **A feed that remembers.** Liking one black hole post no longer floods your dashboard. The CaliStream engine gives every topic a share of the feed proportional to your long-term interest, with a prior that stops one like from taking over. A topic you keep scrolling past cools down for the session. Old interests fade over months instead of being overwritten. Three real engagements in one session mean a genuine new obsession, so it follows that. Tags are grouped on-device (`#black holes` counts toward `#space`) from how tags appear together, with no ML model. Joke and commentary tags (`#i am screaming`) are ignored. A post only collapses if *all* its topics are full, the same blog can't take more than 2 of every 16 posts, repeat reblogs of a post you already saw collapse, and 1 slot in 10 goes to something new so you don't get stuck in a bubble. Nothing is deleted: every hidden post has a "Show anyway" button, and pressing it teaches the engine.
-- **Never miss a mutual.** Tie strength is measured against how much a blog posts, so a quiet friend whose every post you like outranks a firehose you sometimes like. Mutuals (and pinned blogs) skip the topic limits and get highlighted, up to 3 per 16 posts. Their public RSS is checked every 30 min, and the toolbar badge counts posts you haven't seen.
-- **See the algorithm think.** Every post gets a one-line reason ("collapsed · #ao3 2/2 recent slots used up") and a live panel shows what it read, hid and learned. Toggle it off in the popup.
-- **No "Go Premium" nagging.** Optional, on by default.
+<p>
+  <img src="assets/screenshot-feed.png" width="270" alt="A Tumblr post folded into one line: Giving #billy maximoff a rest for a bit, with a Show button">
+  <img src="assets/screenshot-settings.png" width="270" alt="Dashwell settings: new posts from favorites, feed switches, favorite blogs, muted words">
+</p>
 
-![tumblr-new collapsing a flood of #ao3 posts, with reasons and the live panel](assets/screenshot.png)
+## What it fixes
 
-All data stays on your device (`chrome.storage.local`). No Tumblr API key, no server, no tracking.
+- **No ads.** Ad networks blocked with EasyList + AdGuard rules (compiled by [adblock-rs](https://www.npmjs.com/package/adblock-rs)), sponsored posts and the sidebar ad hidden.
+- **One like doesn't flood your feed.** Each topic gets room in proportion to your long-term interest, not your last tap. Seen a lot of one topic? The rest fold into one calm line with a Show button. `#black holes` counts toward `#space`, and joke tags like `#i am screaming` are ignored.
+- **Never miss a mutual.** Blogs you always like are never folded away, and new posts from your favorites show up in Dashwell's settings.
+- **Following stays chronological**, with flood control: one blog's 20-post reblog spree folds after 3. Optionally open Following first.
+- **Mute words, #tags and @blogs.** A muted blog is caught inside other people's reblogs too.
+- **No "Check out these communities", no "Go Premium", no "Rather use the app?" banners.**
+- **Real tab titles** ("Following · Tumblr", "#art · Tumblr") so browser history stops collapsing every page into "Tumblr".
+- **Repeat reblogs** of a post you already saw fold away.
 
 ## Install
 
-1. Download `tumblr-new.zip` from [Releases](../../releases/latest) and unzip it.
-2. Chrome / Comet / Edge / Brave / Arc: open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, pick the unzipped folder.
-3. Firefox: `about:debugging` → This Firefox → **Load Temporary Add-on** → pick `manifest.json`.
-4. Open your dashboard. Like and reblog as usual; it learns from that.
+**Android:** download `Dashwell.apk` from [Releases](../../releases/latest), open it, allow the install. Log in with email and password (Google and Apple block sign-in inside apps; use "Forgot password" with your Google email to set one). The app tells you when an update is out.
+
+**Chrome, Comet, Edge, Brave, Arc:** download `Dashwell-extension.zip` from [Releases](../../releases/latest) and unzip it. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, pick the folder. Dashwell's settings show when a new version is out.
+
+**Firefox:** `about:debugging` → This Firefox → **Load Temporary Add-on** → `manifest.json`.
+
+## How the feed works
+
+`extension/feed.js` is the engine, plain JavaScript with no DOM, shared by the extension and the app. It is built from published recommender research: calibrated recommendations (Steck 2018) with a Dirichlet prior so one like can't take over, session satiation (Kapoor et al. 2015), tag grouping by co-occurrence (NPMI), xQuAD-style multi-topic rescue, tie strength normalized by posting rate (Gilbert & Karahalios 2009), and a 1-in-10 discovery slot. `npm test` runs its scenarios.
 
 ## Develop
 
-1. `npm install` (builds adblock-rs, needs a Rust toolchain)
-2. `npm run build` regenerates `extension/rules/ads.json` + `extension/cosmetic.css` (`-- --refresh` re-downloads lists)
-3. Chrome / Comet / Edge: `chrome://extensions` → Developer mode → Load unpacked → `extension/`
-   Firefox: `about:debugging` → Load Temporary Add-on → `extension/manifest.json`
-
-`npm test` runs the feed algorithm tests. `CHROME=<chrome-for-testing> node scripts/try.mjs [url]` loads the extension in a real browser and prints what it did.
-
-## Layout
-
-- `extension/feed.js`: the CaliStream engine. Pure JS with no DOM, so it can be ported to a mobile app. Built from published work: calibrated recommendations (Steck 2018), confidence-aware calibration, xQuAD diversification, satiation (Kapoor et al. 2015), tie strength (Gilbert & Karahalios 2009), Thompson-style exploration (Chapelle & Li 2011).
-- `extension/content.js`: reads posts off the dashboard, records likes/reblogs, collapses or highlights posts.
-- `extension/background.js`: RSS catch-up for favorite blogs.
-- `scripts/build-filters.mjs`: adblock-rs → DNR rules + CSS.
+- `npm install` (builds adblock-rs; needs a Rust toolchain), `npm run build` regenerates the ad rules and cosmetic CSS, `npm test` runs the engine tests.
+- Android: `cd android && ./gradlew assembleRelease` (the app ships `extension/` as its assets, so both stay in sync).
+- `CHROME=<chrome-for-testing> node scripts/try.mjs [url]` loads the extension in a real browser and reports what it did.

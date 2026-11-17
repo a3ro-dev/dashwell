@@ -1,4 +1,4 @@
-# tumblr-new
+# Dashwell
 
 ## What it is
 A layer over tumblr.com (browser extension + Android app) that blocks ads and quietly reshapes the dashboard: one like can't flood the feed, mutuals are never buried, repeat reblogs fold away.

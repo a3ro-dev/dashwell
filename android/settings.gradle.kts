@@ -4,5 +4,5 @@ pluginManagement {
 dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
-rootProject.name = "tumblr-new"
+rootProject.name = "dashwell"
 include(":app")
