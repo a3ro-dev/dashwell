@@ -303,7 +303,30 @@
       .slice(0, limit);
   }
 
+  // Mute list: one rule per line. "@blog" matches the poster or anyone in the reblog trail,
+  // "#tag" matches a tag exactly, anything else matches tags or text as a whole word or phrase.
+  function parseMutes(text) {
+    return String(text ?? '')
+      .split(/[\n,]/)
+      .map((r) => r.trim().toLowerCase())
+      .filter(Boolean)
+      .map((r) => (r.startsWith('@') ? { blog: r.slice(1) } : r.startsWith('#') ? { tag: r.slice(1).trim() } : { word: r }));
+  }
+  const escapeRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function mutedBy(rules, post) {
+    const tags = post.tags.map((t) => t.toLowerCase().replace(/^#+/, '').trim());
+    const blogs = [post.blog, ...(post.trail ?? [])].filter(Boolean).map((b) => b.toLowerCase());
+    const text = `${tags.join(' ')} ${post.text ?? ''}`.toLowerCase();
+    for (const r of rules) {
+      if (r.blog && blogs.includes(r.blog)) return `@${r.blog}`;
+      if (r.tag && tags.includes(r.tag)) return `#${r.tag}`;
+      if (r.word && new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(r.word)}($|[^\\p{L}\\p{N}])`, 'u').test(text)) return `"${r.word}"`;
+    }
+    return null;
+  }
+
   globalThis.TumblrNew = {
+    parseMutes, mutedBy,
     P, emptyProfile, newSession, cleanTags, observe, recluster, decide, recordInteraction,
     tieStrength, favorites, topInterests, quotaFn, clustersOf,
   };

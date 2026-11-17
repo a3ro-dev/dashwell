@@ -166,3 +166,17 @@ test('every decision explains itself in one line', () => {
   const ds = run(T.emptyProfile(), T.newSession(), Array.from({ length: 30 }, (_, i) => post([`t${i % 4}`, 'shared'], `b${i % 7}`)));
   for (const d of ds) assert.ok(d.reason && !d.reason.includes('\n') && !/undefined|NaN/.test(d.reason), d.reason);
 });
+
+test('12. mute list: blogs anywhere in the trail, exact tags, whole phrases', () => {
+  const rules = T.parseMutes('@spoilerbot\n#visionquest spoilers, ship wars, c++');
+  assert.equal(T.mutedBy(rules, { blog: 'a', trail: ['spoilerbot'], tags: [], text: '' }), '@spoilerbot');
+  assert.equal(T.mutedBy(rules, { blog: 'a', tags: ['#VisionQuest Spoilers'], text: '' }), '#visionquest spoilers');
+  assert.equal(T.mutedBy(rules, { blog: 'a', tags: [], text: 'no more ship wars please' }), '"ship wars"');
+  assert.equal(T.mutedBy(rules, { blog: 'a', tags: [], text: 'shipwars' }), null);
+  assert.equal(T.mutedBy(rules, { blog: 'a', tags: [], text: 'i love c++ a lot' }), '"c++"');
+  assert.equal(T.mutedBy(T.parseMutes(''), { blog: 'a', tags: ['x'], text: 'x' }), null);
+});
+
+test('13. sentence-like tags ("#his baby!") never become topics', () => {
+  assert.deepEqual(T.cleanTags(['#his baby!', '#so true', '#oh no', '#marvel']), ['marvel']);
+});
