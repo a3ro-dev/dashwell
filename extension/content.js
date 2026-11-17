@@ -3,14 +3,13 @@
 const T = globalThis.TumblrNew;
 const ARTICLE = '[data-id] article';
 const SPONSORED = ':is([data-cell-id], [data-id]):is(:has(.iab_sf), :has(a[href*="/relevantads"])), aside div:has(> div > div > [id^="aditude"])';
-const DEFAULTS = { hidePremium: true, showAlgo: true, shapeFeed: true };
+const DEFAULTS = { hidePremium: true, shapeFeed: true };
 const FAST_SKIP_MS = 300;
 
 const session = T.newSession();
 const decisions = new Map(); // post id -> decision; Tumblr's list re-mounts posts on scroll
 const posts = new Map(); // post id -> parsed post
 const ads = new Set();
-const log = [];
 let engine = T.emptyProfile();
 let pinned = [];
 let settings = DEFAULTS;
@@ -43,34 +42,29 @@ setInterval(() => {
 }, 5000);
 addEventListener('visibilitychange', () => document.hidden && dirty && (chrome.storage.local.set({ engine }), (dirty = false)));
 
-function learn(post, kind, note) {
+function learn(post, kind) {
   T.recordInteraction(engine, session, post, kind, Date.now());
-  if (note) log.push(note);
   save();
 }
 
 function render(article, post, d) {
-  article.querySelector('.tn-why')?.remove();
-  const why = document.createElement('div');
-  why.className = `tn-why tn-${d.action}`;
-  why.textContent = d.reason;
-  article.prepend(why);
-  article.classList.toggle('tn-favorite', d.action === 'favorite');
-
   if (d.action !== 'collapse' || d.shown || !settings.shapeFeed || article.querySelector('.tn-bar')) return;
   article.classList.add('tn-collapsed');
   const bar = document.createElement('div');
   bar.className = 'tn-bar';
-  bar.textContent = d.reason.replace(/^collapsed: /, 'Hidden: ');
+  const text = document.createElement('p');
+  text.textContent = d.say ?? 'Hidden to keep your feed varied';
   const btn = document.createElement('button');
-  btn.textContent = 'Show anyway';
+  btn.type = 'button';
+  btn.textContent = 'Show';
+  btn.setAttribute('aria-label', `Show hidden post from @${post.blog ?? 'unknown'}`);
   btn.onclick = () => {
     d.shown = true;
     article.classList.remove('tn-collapsed');
     bar.remove();
-    learn(post, 'expand', `you opened a hidden post: ${post.tags.slice(0, 2).join(' ')}`);
+    learn(post, 'expand');
   };
-  bar.append(btn);
+  bar.append(text, btn);
   article.prepend(bar);
 }
 
@@ -90,37 +84,43 @@ const skipWatcher = new IntersectionObserver((entries) => {
   }
 }, { threshold: 0.5 });
 
-let hud;
-function drawHud(found) {
-  if (!document.body) return;
-  if (!hud) {
-    hud = document.createElement('aside');
-    hud.className = 'tn-hud';
-    hud.onclick = () => hud.classList.toggle('tn-min');
-    document.body.append(hud);
+// Android app only: our settings live behind an icon in Tumblr's own top bar, next to Search.
+const IS_APP = !!globalThis.__tnOpenSettings;
+let unreadCount = 0;
+function mountAppButton() {
+  if (!IS_APP || document.querySelector('.tn-app-btn')) return;
+  const search = document.querySelector('header button[aria-label="Search"]');
+  if (!search) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'tn-app-btn';
+  btn.innerHTML =
+    '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span class="tn-count"></span>';
+  btn.onclick = () => globalThis.__tnOpenSettings();
+  search.before(btn);
+  updateAppButton();
+}
+function updateAppButton() {
+  const btn = document.querySelector('.tn-app-btn');
+  if (!btn) return;
+  btn.querySelector('.tn-count').textContent = unreadCount ? String(Math.min(unreadCount, 99)) : '';
+  btn.setAttribute('aria-label', unreadCount ? `tumblr-new settings, ${unreadCount} new posts from favorites` : 'tumblr-new settings');
+}
+
+// Tumblr's "Rather use the mobile app?" banner and other app-store nags.
+function hideAppNags() {
+  for (const a of document.querySelectorAll('a[href*="play.google.com"], a[href*="apps.apple.com"], a[href^="intent:"], a[href^="tumblr:"]')) {
+    if (a.closest('article')) continue;
+    let box = a;
+    while (box.parentElement && box.parentElement !== document.body && box.parentElement.innerText.length < 160) box = box.parentElement;
+    box.style.setProperty('display', 'none', 'important');
   }
-  const count = (a) => [...decisions.values()].filter((d) => d.action === a).length;
-  const lines = [
-    'tumblr-new · CaliStream (click to fold)',
-    !onFeed()
-      ? 'not the dashboard: feed shaping paused here'
-      : decisions.size || found
-        ? `read ${decisions.size} · shown ${count('show')} · mutuals ${count('favorite')} · explored ${count('explore')} · hidden ${count('collapse')}`
-        : 'waiting for posts… if this stays, Tumblr changed its markup',
-    `sponsored hidden: ${ads.size}${settings.shapeFeed ? '' : ' · shaping OFF (labels only)'}`,
-    `learned: ${Object.keys(engine.tags).length} tags in ${T.topInterests(engine, Date.now(), 999).length} topics · ${T.favorites(engine, pinned, Date.now()).length} mutuals`,
-    `top: ${T.topInterests(engine, Date.now(), 4).map((i) => '#' + i.tag).join(' ') || 'like or reblog posts to teach it'}`,
-    ...log.slice(-5).reverse(),
-  ];
-  hud.replaceChildren(...lines.map((l, i) => Object.assign(document.createElement(i ? 'div' : 'b'), { textContent: l })));
 }
 
 function scan() {
   for (const cell of document.querySelectorAll(SPONSORED)) ads.add(cell);
-  let found = 0;
   if (onFeed()) {
     for (const article of document.querySelectorAll(`${ARTICLE}:not([data-tn])`)) {
-      found++;
       article.dataset.tn = '1';
       const post = readPost(article);
       if (!post.id) continue;
@@ -130,21 +130,18 @@ function scan() {
         const d = T.decide(engine, session, post, pinned, now);
         decisions.set(post.id, d);
         posts.set(post.id, post);
-        log.push(`${post.blog ?? '?'}: ${d.reason}`);
         save();
       }
       render(article, post, decisions.get(post.id));
       skipWatcher.observe(article);
     }
   }
-  if (settings.showAlgo) drawHud(found);
+  hideAppNags();
+  mountAppButton();
 }
 
 function applySettings() {
-  const html = document.documentElement.classList;
-  html.toggle('tn-hide-premium', settings.hidePremium);
-  html.toggle('tn-show-algo', settings.showAlgo);
-  if (!settings.showAlgo) hud?.remove(), (hud = null);
+  document.documentElement.classList.toggle('tn-hide-premium', settings.hidePremium);
 }
 
 // Learn from likes and reblogs. Clicking "Like" only happens on a not-yet-liked post.
@@ -156,7 +153,7 @@ document.addEventListener(
     if (!article) return;
     const post = readPost(article);
     const kind = btn.ariaLabel === 'Reblog' ? 'reblog' : 'like';
-    learn(post, kind, `learned from ${kind}: @${post.blog ?? '?'} ${post.tags.slice(0, 3).join(' ')}`);
+    learn(post, kind);
   },
   true,
 );
@@ -167,20 +164,21 @@ chrome.storage.onChanged.addListener((changes) => {
     settings = { ...DEFAULTS, ...changes.settings.newValue };
     applySettings();
   }
-  if (changes.engine && !changes.engine.newValue) engine = T.emptyProfile(); // reset from popup
+  if (changes.engine && !changes.engine.newValue) engine = T.emptyProfile(); // reset from settings
+  if (changes.unread) (unreadCount = changes.unread.newValue?.length ?? 0), updateAppButton();
   scan();
 });
 
-chrome.storage.local.get({ engine: null, pinned, settings }).then((s) => {
+chrome.storage.local.get({ engine: null, pinned, settings, unread: [] }).then((s) => {
   engine = s.engine ?? T.emptyProfile();
+  unreadCount = s.unread.length;
   pinned = s.pinned;
   settings = { ...DEFAULTS, ...s.settings };
   applySettings();
   scan();
   let queued = false;
-  new MutationObserver((muts) => {
-    // our own HUD redraws would otherwise re-trigger scan every frame
-    if (queued || muts.every((m) => hud?.contains(m.target))) return;
+  new MutationObserver(() => {
+    if (queued) return;
     queued = true;
     requestAnimationFrame(() => {
       queued = false;

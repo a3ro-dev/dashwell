@@ -1,3 +1,6 @@
+/* tumblr-new on-page layer. Tumblr stays the visual authority: Tumblr's own font and
+   palette variables (--black is the text colour, --white the surface), so every palette works. */
+
 /* Sponsored posts, by markers that survive Tumblr's class-name reshuffles. */
 :is([data-cell-id], [data-id]):has(.iab_sf),
 :is([data-cell-id], [data-id]):has(a[href*="/relevantads"]),
@@ -6,39 +9,76 @@ aside div:has(> div > div > [id^="aditude"]) {
   display: none !important;
 }
 
-/* "Go Premium" / "Go Ad-Free" buttons: matched by Tumblr's premium-diamond icon or link,
-   only in nav/sidebar/top bar so premium badges inside posts stay. */
+/* "Go Premium" / "Go Ad-Free": matched by Tumblr's premium icon or link, only in nav,
+   sidebar and top bar so premium badges inside posts stay. */
 .tn-hide-premium :is(nav, aside, header[role="banner"], [role="navigation"]) :is(a, button, li):is(:has(use[href*="premium"]), [href*="/premium"], [href*="ad-free"]),
 .tn-hide-premium [data-testid="controlled-popover-wrapper"]:has(button[aria-label*="premium" i]),
 .tn-hide-premium button[aria-label*="premium" i]:not(article *) {
   display: none !important;
 }
 
-/* Feed shaping */
-article.tn-collapsed > :not(.tn-bar, .tn-why) { display: none !important; }
+/* A held-back post: one calm line in the post's own card. */
+article.tn-collapsed > :not(.tn-bar) { display: none !important; }
 .tn-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 10px 16px; font-size: 14px; line-height: 1.4 !important; opacity: 0.75;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 12px 12px 16px;
+  font: inherit;
+  line-height: 1.4 !important;
+}
+.tn-bar p {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4 !important;
+  color: rgba(var(--black), 0.75);
 }
 .tn-bar button {
-  font: inherit; color: inherit; background: none; border: 1px solid currentColor;
-  border-radius: 999px; padding: 2px 12px; line-height: 1.4 !important; cursor: pointer;
+  flex: none;
+  min-height: 36px;
+  min-width: 64px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 18px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4 !important;
+  color: rgb(var(--black));
+  background: rgba(var(--black), 0.07);
+  cursor: pointer;
+  transition: background-color 120ms ease-out;
 }
-article.tn-favorite { box-shadow: 0 0 0 2px #00b8ff; }
+.tn-bar button:hover { background: rgba(var(--black), 0.13); }
+.tn-bar button:active { background: rgba(var(--black), 0.18); }
+.tn-bar button:focus-visible { outline: 2px solid rgb(var(--blue, 0 184 255)); outline-offset: 2px; }
 
-/* Algorithm view: why each post was shown/collapsed, plus a live HUD */
-.tn-why { display: none; }
-.tn-show-algo .tn-why {
-  display: block; margin: 8px 12px 0; padding: 3px 10px; border-radius: 8px;
-  font: 600 12px/1.4 system-ui, sans-serif; background: #00b8ff22; color: #0a7fb3;
+/* Android app: settings icon in Tumblr's top bar, before Search. Sized like Tumblr's own icons. */
+.tn-app-btn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
 }
-.tn-show-algo .tn-why.tn-collapse { background: #ff492f22; color: #c2361f; }
-.tn-show-algo .tn-why.tn-favorite { background: #ffd40022; color: #9a7d00; }
-.tn-hud {
-  position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; width: 320px;
-  padding: 10px 12px; border-radius: 12px; background: #001935f0; color: #fff;
-  font: 12px/1.5 system-ui, sans-serif; box-shadow: 0 8px 24px #0006; cursor: pointer;
+.tn-app-btn:focus-visible { outline: 2px solid rgb(var(--blue, 0 184 255)); outline-offset: -4px; border-radius: 8px; }
+.tn-count:empty { display: none; }
+.tn-count {
+  position: absolute;
+  top: 6px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font: 700 11px/18px var(--font-family, sans-serif);
+  text-align: center;
+  color: #000;
+  background: rgb(0 184 255);
 }
-.tn-hud b { display: block; margin-bottom: 4px; color: #00b8ff; }
-.tn-hud div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tn-hud.tn-min > :not(b) { display: none; }
