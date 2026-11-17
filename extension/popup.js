@@ -3,8 +3,9 @@ const $ = (id) => document.getElementById(id);
 const el = (tag, text, props = {}) => Object.assign(document.createElement(tag), { textContent: text, ...props });
 
 async function draw() {
-  const s = await chrome.storage.local.get({ profile: T.emptyProfile(), pinned: [], unread: [] });
+  const s = await chrome.storage.local.get({ engine: null, pinned: [], unread: [] });
   const now = Date.now();
+  const engine = s.engine ?? T.emptyProfile();
 
   if (s.unread.length) {
     $('unread').replaceChildren(
@@ -17,7 +18,7 @@ async function draw() {
   }
 
   $('favs').replaceChildren(
-    ...T.favorites(s.profile, s.pinned, now).map((b) =>
+    ...T.favorites(engine, s.pinned, now).map((b) =>
       el('span', s.pinned.includes(b) ? `📌 ${b} ✕` : b, {
         className: 'chip',
         title: s.pinned.includes(b) ? 'Unpin' : 'Learned from your likes',
@@ -26,7 +27,7 @@ async function draw() {
     ),
   );
 
-  const top = T.topInterests(s.profile, now);
+  const top = T.topInterests(engine, now);
   $('interests').replaceChildren(
     ...(top.length
       ? top.map(({ tag, score }) => {
@@ -67,6 +68,13 @@ chrome.storage.local.get({ settings: {} }).then(({ settings }) => {
     };
   }
 });
+
+$('reset').onclick = async () => {
+  if (!confirm('Forget every interest and mutual it learned? Pinned blogs stay.')) return;
+  await chrome.storage.local.remove(['engine', 'unread', 'lastSeen']);
+  await chrome.action.setBadgeText({ text: '' });
+  draw();
+};
 
 $('refresh').onclick = () => chrome.runtime.sendMessage('check');
 chrome.storage.onChanged.addListener(draw);

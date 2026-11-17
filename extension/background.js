@@ -19,9 +19,9 @@ function parseRss(xml) {
 }
 
 async function check() {
-  const s = await chrome.storage.local.get({ profile: T.emptyProfile(), pinned: [], lastSeen: {}, unread: [] });
+  const s = await chrome.storage.local.get({ engine: null, pinned: [], lastSeen: {}, unread: [] });
   const now = Date.now();
-  const blogs = T.favorites(s.profile, s.pinned, now);
+  const blogs = T.favorites(s.engine ?? T.emptyProfile(), s.pinned, now);
   const unread = [];
   for (const blog of blogs) {
     s.lastSeen[blog] ??= now; // first time we watch a blog: start from now, no backlog flood
