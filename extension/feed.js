@@ -63,18 +63,18 @@
   }
 
   // recent: array of tag-arrays for the last posts shown (mutated).
-  // Returns { action: 'favorite' | 'show' | 'collapse', tag? }.
+  // Returns { action: 'favorite' | 'show' | 'collapse', tag, seen, allowed } where tag is the
+  // post's most crowded topic (seen of allowed slots in the recent window), for explaining the decision.
   function decide(profile, pinned, recent, post, now) {
     const tags = [...new Set(post.tags.map(norm))].filter(Boolean);
     let result = { action: 'show' };
-    if (post.blog && isFavorite(profile, pinned, post.blog, now)) {
-      result = { action: 'favorite' };
-    } else {
-      for (const tag of tags) {
-        const seen = recent.filter((r) => r.includes(tag)).length;
-        if (seen >= allowedSlots(profile, tag, now)) return { action: 'collapse', tag, seen };
-      }
+    for (const tag of tags) {
+      const seen = recent.filter((r) => r.includes(tag)).length;
+      const allowed = allowedSlots(profile, tag, now);
+      if (!result.tag || seen / allowed > result.seen / result.allowed) Object.assign(result, { tag, seen, allowed });
     }
+    if (post.blog && isFavorite(profile, pinned, post.blog, now)) result.action = 'favorite';
+    else if (result.tag && result.seen >= result.allowed) return { ...result, action: 'collapse' };
     recent.push(tags);
     if (recent.length > WINDOW) recent.shift();
     return result;

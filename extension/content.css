@@ -1,12 +1,19 @@
 /* Sponsored posts, by markers that survive Tumblr's class-name reshuffles. */
-[data-cell-id]:has(.iab_sf),
-[data-cell-id]:has(a[href*="/relevantads"]),
-aside div:has(> a[href*="/relevantads"]) {
+:is([data-cell-id], [data-id]):has(.iab_sf),
+:is([data-cell-id], [data-id]):has(a[href*="/relevantads"]),
+aside div:has(> a[href*="/relevantads"]),
+aside div:has(> div > div > [id^="aditude"]) {
   display: none !important;
 }
 
-/* Feed shaping UI */
-article.tn-collapsed > :not(.tn-bar) { display: none !important; }
+/* "Go Premium" / "Go Ad-Free" buttons: matched by Tumblr's premium-diamond icon or link,
+   only in nav/sidebar/top bar so premium badges inside posts stay. */
+:is(.tn-hide-premium) :is(nav, aside, header[role="banner"], [role="navigation"]) :is(a, button, li):is(:has(use[href*="premium"]), [href*="/premium"], [href*="ad-free"]) {
+  display: none !important;
+}
+
+/* Feed shaping */
+article.tn-collapsed > :not(.tn-bar, .tn-why) { display: none !important; }
 .tn-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 10px 16px; font-size: 14px; opacity: 0.75;
@@ -15,8 +22,21 @@ article.tn-collapsed > :not(.tn-bar) { display: none !important; }
   font: inherit; color: inherit; background: none; border: 1px solid currentColor;
   border-radius: 999px; padding: 2px 12px; cursor: pointer;
 }
-article.tn-favorite { box-shadow: 0 0 0 2px rgb(var(--accent, 0 184 255)); }
-.tn-badge {
-  display: inline-block; margin: 8px 16px 0; padding: 1px 8px; border-radius: 999px;
-  font-size: 12px; font-weight: 700; background: rgb(var(--accent, 0 184 255)); color: rgb(var(--black, 0 0 0));
+article.tn-favorite { box-shadow: 0 0 0 2px #00b8ff; }
+
+/* Algorithm view: why each post was shown/collapsed, plus a live HUD */
+.tn-why { display: none; }
+.tn-show-algo .tn-why {
+  display: block; margin: 8px 12px 0; padding: 3px 10px; border-radius: 8px;
+  font: 600 12px/1.4 system-ui, sans-serif; background: #00b8ff22; color: #0a7fb3;
 }
+.tn-show-algo .tn-why.tn-collapse { background: #ff492f22; color: #c2361f; }
+.tn-show-algo .tn-why.tn-favorite { background: #ffd40022; color: #9a7d00; }
+.tn-hud {
+  position: fixed; right: 16px; bottom: 16px; z-index: 2147483647; width: 320px;
+  padding: 10px 12px; border-radius: 12px; background: #001935f0; color: #fff;
+  font: 12px/1.5 system-ui, sans-serif; box-shadow: 0 8px 24px #0006; cursor: pointer;
+}
+.tn-hud b { display: block; margin-bottom: 4px; color: #00b8ff; }
+.tn-hud div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tn-hud.tn-min > :not(b) { display: none; }
