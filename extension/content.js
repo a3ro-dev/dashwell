@@ -120,10 +120,18 @@ function updateAppButton() {
 
 // Tumblr's "Rather use the mobile app?" banner and other app-store nags.
 function hideAppNags() {
+  // Hide only the small banner around an app-store link. Never anything that holds Tumblr's own
+  // page: while a page renders its containers can look empty, and climbing past them blanked the app.
+  const PAGE = 'header, nav, main, article, [data-timeline-id], [data-cell-id], [role="dialog"]';
   for (const a of document.querySelectorAll('a[href*="play.google.com"], a[href*="apps.apple.com"], a[href^="intent:"], a[href^="tumblr:"]')) {
-    if (a.closest('article')) continue;
+    if (a.closest('article, nav, [role="dialog"]') || a.dataset.tnNag) continue;
+    a.dataset.tnNag = '1';
     let box = a;
-    while (box.parentElement && box.parentElement !== document.body && box.parentElement.innerText.length < 160) box = box.parentElement;
+    for (let i = 0; i < 4; i++) {
+      const up = box.parentElement;
+      if (!up || up === document.body || up.matches(PAGE) || up.querySelector(PAGE) || up.textContent.length > 200) break;
+      box = up;
+    }
     box.style.setProperty('display', 'none', 'important');
   }
 }
@@ -227,13 +235,15 @@ chrome.storage.local.get({ engine: null, pinned, settings, unread: [], mutes: ''
   followingFirst();
   applySettings();
   scan();
+  // Batch DOM changes: scanning on every animation frame starved rendering on phones
+  // (black, unpainted tiles while menus animate). 120 ms is still well under a scroll's notice.
   let queued = false;
   new MutationObserver(() => {
     if (queued) return;
     queued = true;
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       queued = false;
       scan();
-    });
+    }, 120);
   }).observe(document.documentElement, { childList: true, subtree: true });
 });
