@@ -3,7 +3,7 @@
 const T = globalThis.TumblrNew;
 const ARTICLE = '[data-id] article';
 const SPONSORED = ':is([data-cell-id], [data-id]):is(:has(.iab_sf), :has(a[href*="/relevantads"])), aside div:has(> div > div > [id^="aditude"])';
-const DEFAULTS = { hidePremium: true, shapeFeed: true };
+const DEFAULTS = { hidePremium: true, shapeFeed: true, hideSuggestions: true, followingFirst: false };
 const FAST_SKIP_MS = 300;
 
 const session = T.newSession();
@@ -13,6 +13,8 @@ const ads = new Set();
 let engine = T.emptyProfile();
 let pinned = [];
 let settings = DEFAULTS;
+let mutes = [];
+const followWindow = []; // blogs of recently shown posts on the chronological Following tab
 let dirty = false;
 
 // The logged-in home is "/" or "/dashboard..."; tag and blog pages are skipped because
@@ -26,8 +28,17 @@ function readPost(article) {
     .map((a) => a.getAttribute('href').match(/^(?:https:\/\/www\.tumblr\.com)?\/[\w-]+\/(\d{6,})/)?.[1])
     .filter((x) => x && x !== id)
     .at(-1);
+  const trail = [
+    ...new Set(
+      [...article.querySelectorAll('a[href]')]
+        .map((a) => a.getAttribute('href').match(/^(?:https:\/\/www\.tumblr\.com)?\/([\w-]+)\/\d{6,}/)?.[1])
+        .filter(Boolean),
+    ),
+  ];
   return {
     id,
+    trail,
+    text: article.textContent.slice(0, 4000),
     root: root ?? id,
     blog: article.querySelector('header a[rel="author"]')?.textContent.trim(),
     tags: [...article.querySelectorAll('a[data-testid="tag-link"]')].map((a) => a.textContent),
@@ -104,7 +115,7 @@ function updateAppButton() {
   const btn = document.querySelector('.tn-app-btn');
   if (!btn) return;
   btn.querySelector('.tn-count').textContent = unreadCount ? String(Math.min(unreadCount, 99)) : '';
-  btn.setAttribute('aria-label', unreadCount ? `tumblr-new settings, ${unreadCount} new posts from favorites` : 'tumblr-new settings');
+  btn.setAttribute('aria-label', unreadCount ? `Dashwell settings, ${unreadCount} new posts from favorites` : 'Dashwell settings');
 }
 
 // Tumblr's "Rather use the mobile app?" banner and other app-store nags.
@@ -117,7 +128,37 @@ function hideAppNags() {
   }
 }
 
+// Mutes first (everywhere on the feed), then: Following stays chronological with only
+// flood control; For you gets the full engine.
+function decideHere(post, now) {
+  const muted = T.mutedBy(mutes, post);
+  if (muted) return { action: 'collapse', reason: `muted: ${muted}`, say: `Muted: ${muted}` };
+  if (location.pathname.startsWith('/dashboard/following')) {
+    const n = followWindow.filter((b) => b === post.blog).length;
+    if (n >= 3 && !pinned.includes(post.blog)) return { action: 'collapse', reason: `flood: @${post.blog}`, say: `@${post.blog} has posted a lot in a row` };
+    followWindow.push(post.blog);
+    if (followWindow.length > 16) followWindow.shift();
+    return { action: 'show', reason: 'following: chronological' };
+  }
+  return T.decide(engine, session, post, pinned, now);
+}
+
+// Every Tumblr page is titled just "Tumblr", which collapses browser history. Name them.
+function retitle() {
+  const parts = location.pathname.split('/').filter(Boolean).map(decodeURIComponent);
+  let name = '';
+  if (parts[0] === 'dashboard') name = parts[1] === 'following' ? 'Following' : 'For you';
+  else if (parts[0] === 'tagged' && parts[1]) name = `#${parts[1]}`;
+  else if (parts[0] === 'search' && parts[1]) name = `Search: ${parts[1]}`;
+  else if (parts[0] === 'settings') name = `Settings${parts[1] ? `: ${parts[1]}` : ''}`;
+  else if (['explore', 'likes', 'inbox', 'activity', 'communities', 'messages'].includes(parts[0])) name = parts[0][0].toUpperCase() + parts[0].slice(1);
+  else if (parts[0] && /^[\w-]+$/.test(parts[0])) name = `@${parts[0]}`;
+  const want = name ? `${name} · Tumblr` : 'Tumblr';
+  if (document.title !== want && /^(Tumblr|.* · Tumblr)$/.test(document.title)) document.title = want;
+}
+
 function scan() {
+  retitle();
   for (const cell of document.querySelectorAll(SPONSORED)) ads.add(cell);
   if (onFeed()) {
     for (const article of document.querySelectorAll(`${ARTICLE}:not([data-tn])`)) {
@@ -127,7 +168,7 @@ function scan() {
       if (!decisions.has(post.id)) {
         const now = Date.now();
         T.observe(engine, post, now);
-        const d = T.decide(engine, session, post, pinned, now);
+        const d = decideHere(post, now);
         decisions.set(post.id, d);
         posts.set(post.id, post);
         save();
@@ -141,7 +182,14 @@ function scan() {
 }
 
 function applySettings() {
-  document.documentElement.classList.toggle('tn-hide-premium', settings.hidePremium);
+  const html = document.documentElement.classList;
+  html.toggle('tn-hide-premium', settings.hidePremium);
+  html.toggle('tn-hide-suggestions', settings.hideSuggestions);
+}
+
+// "Open Following first": only on the first load, so tapping For you still works.
+function followingFirst() {
+  if (settings.followingFirst && ['/', '/dashboard', '/dashboard/stuff_for_you'].includes(location.pathname)) location.replace('/dashboard/following');
 }
 
 // Learn from likes and reblogs. Clicking "Like" only happens on a not-yet-liked post.
@@ -160,6 +208,7 @@ document.addEventListener(
 
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.pinned) pinned = changes.pinned.newValue ?? [];
+  if (changes.mutes) mutes = T.parseMutes(changes.mutes.newValue);
   if (changes.settings) {
     settings = { ...DEFAULTS, ...changes.settings.newValue };
     applySettings();
@@ -169,11 +218,13 @@ chrome.storage.onChanged.addListener((changes) => {
   scan();
 });
 
-chrome.storage.local.get({ engine: null, pinned, settings, unread: [] }).then((s) => {
+chrome.storage.local.get({ engine: null, pinned, settings, unread: [], mutes: '' }).then((s) => {
   engine = s.engine ?? T.emptyProfile();
+  mutes = T.parseMutes(s.mutes);
   unreadCount = s.unread.length;
   pinned = s.pinned;
   settings = { ...DEFAULTS, ...s.settings };
+  followingFirst();
   applySettings();
   scan();
   let queued = false;

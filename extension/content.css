@@ -1,4 +1,4 @@
-/* tumblr-new on-page layer. Tumblr stays the visual authority: Tumblr's own font and
+/* Dashwell on-page layer. Tumblr stays the visual authority: Tumblr's own font and
    palette variables (--black is the text colour, --white the surface), so every palette works. */
 
 /* Sponsored posts, by markers that survive Tumblr's class-name reshuffles. */
@@ -14,6 +14,12 @@ aside div:has(> div > div > [id^="aditude"]) {
 .tn-hide-premium :is(nav, aside, header[role="banner"], [role="navigation"]) :is(a, button, li):is(:has(use[href*="premium"]), [href*="/premium"], [href*="ad-free"]),
 .tn-hide-premium [data-testid="controlled-popover-wrapper"]:has(button[aria-label*="premium" i]),
 .tn-hide-premium button[aria-label*="premium" i]:not(article *) {
+  display: none !important;
+}
+
+/* Tumblr's own suggestion carousels in the feed ("Check out these communities/tags/blogs"). */
+.tn-hide-suggestions [data-cell-id*="timelineObject:carousel"],
+.tn-hide-suggestions [data-cell-id*="timelineObject:title"] {
   display: none !important;
 }
 
