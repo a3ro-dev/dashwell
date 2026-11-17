@@ -1,0 +1,22 @@
+/* Sponsored posts, by markers that survive Tumblr's class-name reshuffles. */
+[data-cell-id]:has(.iab_sf),
+[data-cell-id]:has(a[href*="/relevantads"]),
+aside div:has(> a[href*="/relevantads"]) {
+  display: none !important;
+}
+
+/* Feed shaping UI */
+article.tn-collapsed > :not(.tn-bar) { display: none !important; }
+.tn-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px; font-size: 14px; opacity: 0.75;
+}
+.tn-bar button {
+  font: inherit; color: inherit; background: none; border: 1px solid currentColor;
+  border-radius: 999px; padding: 2px 12px; cursor: pointer;
+}
+article.tn-favorite { box-shadow: 0 0 0 2px rgb(var(--accent, 0 184 255)); }
+.tn-badge {
+  display: inline-block; margin: 8px 16px 0; padding: 1px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; background: rgb(var(--accent, 0 184 255)); color: rgb(var(--black, 0 0 0));
+}
