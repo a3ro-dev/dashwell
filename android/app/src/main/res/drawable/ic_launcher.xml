@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Dashwell mark: a well (ring) with the water line (dash). Same geometry as assets/icon.svg. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="64" android:viewportHeight="64">
-    <path android:fillColor="#001935" android:pathData="M14,0h36a14,14 0 0 1 14,14v36a14,14 0 0 1 -14,14h-36a14,14 0 0 1 -14,-14v-36a14,14 0 0 1 14,-14z" />
-    <path android:fillColor="#FFFFFF" android:pathData="M27,12h8v10h9v8h-9v14c0,3 2,4 4,4h5v8h-7c-6,0 -10,-4 -10,-11v-15h-5v-8h5z" />
-    <path android:fillColor="#00B8FF" android:pathData="M48,10m-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0" />
+    <path android:fillColor="#07131A" android:pathData="M15,0h34a15,15 0 0 1 15,15v34a15,15 0 0 1 -15,15h-34a15,15 0 0 1 -15,-15v-34a15,15 0 0 1 15,-15z" />
+    <path android:strokeColor="#E9F1F2" android:strokeWidth="5.5" android:fillColor="#00000000"
+        android:pathData="M32,14a17,17 0 1 1 0,34a17,17 0 1 1 0,-34z" />
+    <path android:fillColor="#F4D35E" android:pathData="M24.75,35.5h14.5a2.75,2.75 0 0 1 0,5.5h-14.5a2.75,2.75 0 0 1 0,-5.5z" />
 </vector>
