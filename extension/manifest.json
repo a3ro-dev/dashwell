@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "tumblr-new",
+  "version": "0.1.0",
+  "description": "Tumblr without ads, a feed that remembers more than your last like, and never miss a post from your mutuals.",
+  "permissions": ["storage", "alarms", "declarativeNetRequest"],
+  "host_permissions": ["https://*.tumblr.com/*"],
+  "background": {
+    "service_worker": "background.js",
+    "scripts": ["feed.js", "background.js"]
+  },
+  "action": { "default_popup": "popup.html", "default_title": "tumblr-new" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.tumblr.com/*"],
+      "js": ["feed.js", "content.js"],
+      "css": ["cosmetic.css", "content.css"],
+      "run_at": "document_start"
+    }
+  ],
+  "declarative_net_request": {
+    "rule_resources": [{ "id": "ads", "enabled": true, "path": "rules/ads.json" }]
+  },
+  "browser_specific_settings": { "gecko": { "id": "tumblr-new@a3ro-dev" } }
+}
