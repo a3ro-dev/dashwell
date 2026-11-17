@@ -1,0 +1,33 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { width: 340px; margin: 0; padding: 12px 14px; font: 14px system-ui, sans-serif; background: #001935; color: #fff; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; opacity: .7; margin: 14px 0 6px; }
+    a { color: #00b8ff; text-decoration: none; }
+    ul { list-style: none; margin: 0; padding: 0; }
+    li { padding: 5px 0; border-bottom: 1px solid #ffffff1a; }
+    small { opacity: .6; }
+    .bar { height: 4px; background: #00b8ff; border-radius: 2px; margin-top: 2px; }
+    form { display: flex; gap: 6px; }
+    input { flex: 1; font: inherit; padding: 4px 8px; border-radius: 6px; border: 0; }
+    button { font: inherit; padding: 4px 10px; border-radius: 6px; border: 0; cursor: pointer; }
+    .chip { display: inline-block; margin: 3px 4px 0 0; padding: 1px 8px; border-radius: 999px; background: #ffffff1a; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h2>New from your favorites</h2>
+  <ul id="unread"><li><small>Nothing new.</small></li></ul>
+  <p><button id="read">Mark all read</button> <button id="refresh">Check now</button></p>
+
+  <h2>Favorite blogs</h2>
+  <div id="favs"></div>
+  <form id="pin"><input id="blog" placeholder="pin a blog, e.g. staff" aria-label="Blog name"><button>Pin</button></form>
+
+  <h2>What we think you like</h2>
+  <ul id="interests"></ul>
+  <script src="feed.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
