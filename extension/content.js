@@ -1,41 +1,59 @@
-// DOM glue for tumblr.com. Feed logic lives in feed.js (globalThis.TumblrNew).
+// DOM glue for tumblr.com. The feed engine lives in feed.js (globalThis.TumblrNew).
 // shortcut: selectors come from Tumblr's rendered markup (Nov 2026); re-check them when Tumblr redesigns.
 const T = globalThis.TumblrNew;
 const ARTICLE = '[data-id] article';
 const SPONSORED = ':is([data-cell-id], [data-id]):is(:has(.iab_sf), :has(a[href*="/relevantads"])), aside div:has(> div > div > [id^="aditude"])';
 const DEFAULTS = { hidePremium: true, showAlgo: true, shapeFeed: true };
+const FAST_SKIP_MS = 300;
+
+const session = T.newSession();
 const decisions = new Map(); // post id -> decision; Tumblr's list re-mounts posts on scroll
+const posts = new Map(); // post id -> parsed post
 const ads = new Set();
 const log = [];
-const recent = [];
-let profile = T.emptyProfile();
+let engine = T.emptyProfile();
 let pinned = [];
 let settings = DEFAULTS;
+let dirty = false;
 
-// The logged-in home can be "/" or "/dashboard..."; tag/blog pages are skipped because
-// every post there shares a topic and would all collapse.
+// The logged-in home is "/" or "/dashboard..."; tag and blog pages are skipped because
+// every post there shares a topic or an author and would all collapse.
 const onFeed = () => location.pathname === '/' || location.pathname.startsWith('/dashboard');
 
 function readPost(article) {
+  const id = article.closest('[data-id]')?.dataset.id;
+  // Reblog trails link to earlier posts as /blog/postId; the last one that isn't this post is the root.
+  const root = [...article.querySelectorAll('a[href]')]
+    .map((a) => a.getAttribute('href').match(/^(?:https:\/\/www\.tumblr\.com)?\/[\w-]+\/(\d{6,})/)?.[1])
+    .filter((x) => x && x !== id)
+    .at(-1);
   return {
-    id: article.closest('[data-id]')?.dataset.id,
+    id,
+    root: root ?? id,
     blog: article.querySelector('header a[rel="author"]')?.textContent.trim(),
     tags: [...article.querySelectorAll('a[data-testid="tag-link"]')].map((a) => a.textContent),
   };
 }
 
-function explain(d) {
-  const load = d.tag ? `#${d.tag} ${d.seen}/${d.allowed} recent slots` : 'no tags';
-  if (d.action === 'favorite') return `★ favorite blog · always shown · ${load}`;
-  if (d.action === 'collapse') return `collapsed · ${load} used up`;
-  return `shown · ${load}`;
+function save() {
+  dirty = true;
+}
+setInterval(() => {
+  if (dirty) chrome.storage.local.set({ engine }), (dirty = false);
+}, 5000);
+addEventListener('visibilitychange', () => document.hidden && dirty && (chrome.storage.local.set({ engine }), (dirty = false)));
+
+function learn(post, kind, note) {
+  T.recordInteraction(engine, session, post, kind, Date.now());
+  if (note) log.push(note);
+  save();
 }
 
-function render(article, d) {
+function render(article, post, d) {
   article.querySelector('.tn-why')?.remove();
   const why = document.createElement('div');
   why.className = `tn-why tn-${d.action}`;
-  why.textContent = explain(d);
+  why.textContent = d.reason;
   article.prepend(why);
   article.classList.toggle('tn-favorite', d.action === 'favorite');
 
@@ -43,17 +61,34 @@ function render(article, d) {
   article.classList.add('tn-collapsed');
   const bar = document.createElement('div');
   bar.className = 'tn-bar';
-  bar.textContent = `Hidden: you've seen ${d.seen} #${d.tag} posts recently.`;
+  bar.textContent = d.reason.replace(/^collapsed: /, 'Hidden: ');
   const btn = document.createElement('button');
-  btn.textContent = 'Show';
+  btn.textContent = 'Show anyway';
   btn.onclick = () => {
     d.shown = true;
     article.classList.remove('tn-collapsed');
     bar.remove();
+    learn(post, 'expand', `you opened a hidden post: ${post.tags.slice(0, 2).join(' ')}`);
   };
   bar.append(btn);
   article.prepend(bar);
 }
+
+// Fast-skip = a post that was on screen for under 300 ms: a quiet "not now" for its topics.
+const visibleSince = new Map();
+const skipWatcher = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    const id = e.target.closest('[data-id]')?.dataset.id;
+    if (!id) continue;
+    if (e.isIntersecting) visibleSince.set(id, e.time);
+    else if (visibleSince.has(id)) {
+      const ms = e.time - visibleSince.get(id);
+      visibleSince.delete(id);
+      const d = decisions.get(id);
+      if (ms < FAST_SKIP_MS && d && d.action !== 'collapse' && posts.has(id)) learn(posts.get(id), 'skip');
+    }
+  }
+}, { threshold: 0.5 });
 
 let hud;
 function drawHud(found) {
@@ -66,15 +101,15 @@ function drawHud(found) {
   }
   const count = (a) => [...decisions.values()].filter((d) => d.action === a).length;
   const lines = [
-    'tumblr-new · algorithm (click to fold)',
+    'tumblr-new · CaliStream (click to fold)',
     !onFeed()
       ? 'not the dashboard: feed shaping paused here'
       : decisions.size || found
-        ? `posts read ${decisions.size} · shown ${count('show')} · collapsed ${count('collapse')} · favorites ${count('favorite')}`
+        ? `read ${decisions.size} · shown ${count('show')} · mutuals ${count('favorite')} · explored ${count('explore')} · hidden ${count('collapse')}`
         : 'waiting for posts… if this stays, Tumblr changed its markup',
-    `sponsored posts hidden: ${ads.size}${settings.shapeFeed ? '' : ' · shaping OFF (labels only)'}`,
-    `learned: ${Object.keys(profile.tags).length} topics, ${Object.keys(profile.blogs).length} blogs`,
-    `top: ${T.topInterests(profile, Date.now(), 4).map((i) => '#' + i.tag).join(' ') || 'like or reblog posts to teach it'}`,
+    `sponsored hidden: ${ads.size}${settings.shapeFeed ? '' : ' · shaping OFF (labels only)'}`,
+    `learned: ${Object.keys(engine.tags).length} tags in ${T.topInterests(engine, Date.now(), 999).length} topics · ${T.favorites(engine, pinned, Date.now()).length} mutuals`,
+    `top: ${T.topInterests(engine, Date.now(), 4).map((i) => '#' + i.tag).join(' ') || 'like or reblog posts to teach it'}`,
     ...log.slice(-5).reverse(),
   ];
   hud.replaceChildren(...lines.map((l, i) => Object.assign(document.createElement(i ? 'div' : 'b'), { textContent: l })));
@@ -90,11 +125,16 @@ function scan() {
       const post = readPost(article);
       if (!post.id) continue;
       if (!decisions.has(post.id)) {
-        const d = T.decide(profile, pinned, recent, post, Date.now());
+        const now = Date.now();
+        T.observe(engine, post, now);
+        const d = T.decide(engine, session, post, pinned, now);
         decisions.set(post.id, d);
-        log.push(`${post.blog ?? '?'}: ${explain(d)}`);
+        posts.set(post.id, post);
+        log.push(`${post.blog ?? '?'}: ${d.reason}`);
+        save();
       }
-      render(article, decisions.get(post.id));
+      render(article, post, decisions.get(post.id));
+      skipWatcher.observe(article);
     }
   }
   if (settings.showAlgo) drawHud(found);
@@ -115,26 +155,24 @@ document.addEventListener(
     const article = btn?.closest('article');
     if (!article) return;
     const post = readPost(article);
-    const reblog = btn.ariaLabel === 'Reblog';
-    T.recordInteraction(profile, post, reblog ? 2 : 1, Date.now());
-    log.push(`learned from ${reblog ? 'reblog' : 'like'}: ${post.blog ?? '?'} ${post.tags.slice(0, 3).join(' ')}`);
-    chrome.storage.local.set({ profile });
+    const kind = btn.ariaLabel === 'Reblog' ? 'reblog' : 'like';
+    learn(post, kind, `learned from ${kind}: @${post.blog ?? '?'} ${post.tags.slice(0, 3).join(' ')}`);
   },
   true,
 );
 
 chrome.storage.onChanged.addListener((changes) => {
-  if (changes.profile) profile = changes.profile.newValue ?? T.emptyProfile();
   if (changes.pinned) pinned = changes.pinned.newValue ?? [];
   if (changes.settings) {
     settings = { ...DEFAULTS, ...changes.settings.newValue };
     applySettings();
   }
+  if (changes.engine && !changes.engine.newValue) engine = T.emptyProfile(); // reset from popup
   scan();
 });
 
-chrome.storage.local.get({ profile, pinned, settings }).then((s) => {
-  profile = s.profile;
+chrome.storage.local.get({ engine: null, pinned, settings }).then((s) => {
+  engine = s.engine ?? T.emptyProfile();
   pinned = s.pinned;
   settings = { ...DEFAULTS, ...s.settings };
   applySettings();
