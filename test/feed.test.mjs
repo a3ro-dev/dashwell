@@ -4,62 +4,165 @@ import '../extension/feed.js';
 
 const T = globalThis.TumblrNew;
 const DAY = 864e5;
-const now = Date.UTC(2026, 10, 17);
+const now = Date.UTC(2026, 10, 18);
 let n = 0;
-const post = (tags, blog = `blog${n++}`) => ({ tags, blog });
+const post = (tags, blog = `blog${n}`, extra = {}) => ({ id: `p${n++}`, tags, blog, ...extra });
 
-function history() {
-  // months of varied likes, then ONE fresh black-holes like
+// Run posts through the engine the way the content script does: observe, then decide.
+function run(p, s, posts, pinned = [], t = now) {
+  return posts.map((x) => {
+    T.observe(p, x, t);
+    return T.decide(p, s, x, pinned, t);
+  });
+}
+const shownCount = (ds) => ds.filter((d) => d.action !== 'collapse').length;
+
+function artMusicProfile() {
   const p = T.emptyProfile();
-  for (let d = 90; d > 0; d -= 3) {
-    T.recordInteraction(p, post(['art', 'illustration']), 1, now - d * DAY);
-    T.recordInteraction(p, post(['books']), 1, now - d * DAY);
-    T.recordInteraction(p, post(['cats']), 1, now - d * DAY);
+  const s = T.newSession();
+  for (let i = 0; i < 10; i++) {
+    T.recordInteraction(p, s, post(['art']), 'like', now - (i + 1) * DAY);
+    T.recordInteraction(p, s, post(['music']), 'like', now - (i + 1) * DAY);
   }
-  T.recordInteraction(p, post(['black holes', 'space']), 1, now);
   return p;
 }
 
-test('one like does not flood the feed with that topic', () => {
-  const p = history();
-  const recent = [];
-  const actions = Array.from({ length: 6 }, () => T.decide(p, [], recent, post(['black holes']), now).action);
-  assert.deepEqual(actions, ['show', 'show', 'collapse', 'collapse', 'collapse', 'collapse']);
+test('1. one like does not flood the feed', () => {
+  const p = artMusicProfile();
+  const s = T.newSession();
+  const liked = post(['elden ring']);
+  run(p, s, [liked]);
+  T.recordInteraction(p, s, liked, 'like', now);
+  const ds = run(p, s, Array.from({ length: 12 }, () => post(['elden ring'])));
+  assert.ok(shownCount(ds) <= 2, `shown ${shownCount(ds)} of 12`);
+  assert.match(ds.at(-1).reason, /#elden ring used \d\/\d of its recent slots/);
 });
 
-test('long-term interests get more room than a one-off like', () => {
-  const p = history();
-  const recent = [];
-  const shown = Array.from({ length: 12 }, () => T.decide(p, [], recent, post(['cats']), now).action).filter((a) => a !== 'collapse');
-  assert.ok(shown.length > 2, `cats shown ${shown.length}`);
+test('1b. fresh profile: a 12-post topic flood shows at most 3', () => {
+  const ds = run(T.emptyProfile(), T.newSession(), Array.from({ length: 12 }, () => post(['space'])));
+  assert.ok(shownCount(ds) <= 3, `shown ${shownCount(ds)}`);
 });
 
-test('favorite blogs are never collapsed, and are learned from interactions', () => {
-  const p = history();
-  for (let i = 0; i < 4; i++) T.recordInteraction(p, post(['black holes'], 'mutual'), 1, now);
-  const recent = [];
-  const actions = Array.from({ length: 6 }, () => T.decide(p, [], recent, post(['black holes'], 'mutual'), now).action);
-  assert.ok(actions.every((a) => a === 'favorite'));
-  assert.ok(T.favorites(p, ['pinnedblog'], now).includes('mutual'));
-  assert.equal(T.favorites(p, ['pinnedblog'], now)[0], 'pinnedblog');
+test('2. a sustained new interest (3 distinct posts) gets real room', () => {
+  const p = artMusicProfile();
+  const s = T.newSession();
+  const before = T.quotaFn(p, now)('elden ring');
+  for (let i = 0; i < 3; i++) T.recordInteraction(p, s, post(['elden ring']), 'like', now);
+  const after = T.quotaFn(p, now)('elden ring');
+  assert.ok(before <= 2 && after >= 3, `quota ${before} -> ${after}`);
 });
 
-test('interest decays but is not forgotten', () => {
+test('3. dormant interests are remembered, not wiped by recent ones', () => {
   const p = T.emptyProfile();
-  T.recordInteraction(p, post(['old love']), 1, now - 60 * DAY);
+  const s = T.newSession();
+  for (let i = 0; i < 30; i++) T.recordInteraction(p, s, post(['hollow knight']), 'like', now - 45 * DAY);
+  for (let i = 0; i < 15; i++) T.recordInteraction(p, s, post(['f1']), 'like', now - (i % 14) * DAY);
+  const ds = run(p, T.newSession(), [post(['f1']), post(['hollow knight']), post(['f1']), post(['hollow knight'])]);
+  assert.deepEqual(ds.map((d) => d.action), ['show', 'show', 'show', 'show']);
   const [top] = T.topInterests(p, now);
-  assert.equal(top.tag, 'old love');
-  assert.ok(top.score > 0 && top.score < Math.log1p(1));
+  assert.ok(['hollow knight', 'f1'].includes(top.tag));
 });
 
-test('a 30-tag post counts as one interaction, not thirty', () => {
+test('4. commentary and meta tags carry no weight and never collapse', () => {
+  assert.deepEqual(T.cleanTags(['#i am literally screaming right now', '#mine', '#queued', '#sob', '#Black Holes', '#sobriety']), ['black hole', 'sobriety']);
   const p = T.emptyProfile();
-  T.recordInteraction(p, post(Array.from({ length: 30 }, (_, i) => `t${i}`)), 1, now);
-  const total = Object.values(p.tags).reduce((s, e) => s + e.w, 0);
-  assert.ok(Math.abs(total - 1) < 1e-9);
+  const s = T.newSession();
+  T.recordInteraction(p, s, post(['i am literally screaming right now']), 'like', now);
+  assert.equal(Object.keys(p.tags).length, 0);
+  const ds = run(p, s, Array.from({ length: 6 }, () => post(['i am literally screaming right now'])));
+  assert.ok(ds.every((d) => d.action === 'show'));
 });
 
-test('posts without tags are always shown', () => {
-  const recent = [];
-  for (let i = 0; i < 20; i++) assert.equal(T.decide(T.emptyProfile(), [], recent, post([]), now).action, 'show');
+test('5. NPMI co-occurrence groups #black holes and #astrophysics under #space', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  for (let i = 0; i < 8; i++) T.observe(p, post(['black holes', 'space']), now);
+  for (let i = 0; i < 6; i++) T.observe(p, post(['astrophysics', 'space']), now);
+  for (let i = 0; i < 30; i++) T.observe(p, post([`topic ${i}`, `other ${i}`]), now);
+  T.recluster(p);
+  assert.equal(p.map['black hole'], 'space');
+  assert.equal(p.map['astrophysics'], 'space');
+  for (let i = 0; i < 3; i++) T.recordInteraction(p, s, post(['black holes']), 'like', now);
+  assert.deepEqual(T.clustersOf(p, post(['astrophysics']), now), ['space']);
+  assert.equal(T.topInterests(p, now)[0].tag, 'space');
+});
+
+test('6. quiet mutual beats a high-volume blog you rarely like', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  const start = now - 14 * DAY;
+  for (let i = 0; i < 4; i++) {
+    const x = post([], 'quiet-friend');
+    T.observe(p, x, start + i * 3.5 * DAY);
+    T.recordInteraction(p, s, x, 'like', start + i * 3.5 * DAY);
+  }
+  for (let i = 0; i < 200; i++) {
+    const x = post([], 'spammy-reblogger');
+    T.observe(p, x, start + i * 0.07 * DAY);
+    if (i % 33 === 0) T.recordInteraction(p, s, x, 'like', start + i * 0.07 * DAY);
+  }
+  const quiet = T.tieStrength(p, 'quiet-friend', [], now);
+  const spam = T.tieStrength(p, 'spammy-reblogger', [], now);
+  assert.ok(quiet >= T.P.TIE && spam < T.P.TIE, `quiet ${quiet.toFixed(2)} spam ${spam.toFixed(2)}`);
+  assert.deepEqual(T.favorites(p, [], now), ['quiet-friend']);
+});
+
+test('7. a pinned mutual is never quota-collapsed, but a 5-post burst is damped', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  const ao3 = run(p, s, Array.from({ length: 4 }, () => post(['ao3'])));
+  const full = ao3.filter((d) => d.action === 'collapse').length;
+  assert.ok(full >= 1);
+  const bestie = run(p, s, Array.from({ length: 5 }, () => post(['ao3'], 'bestie')), ['bestie']);
+  assert.deepEqual(bestie.map((d) => d.action), ['favorite', 'favorite', 'favorite', 'collapse', 'collapse']);
+  assert.match(bestie[3].reason, /@bestie used 3\/2 recent author slots/);
+});
+
+test('8. reblogs of an already-seen post collapse, unless from a mutual', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  const [a, b, c] = run(p, s, [post(['x'], 'origin', { root: 'r1' }), post(['x'], 'random', { root: 'r1' }), post(['x'], 'bestie', { root: 'r1' })], ['bestie']);
+  assert.equal(a.action, 'show');
+  assert.equal(b.action, 'collapse');
+  assert.match(b.reason, /already saw/);
+  assert.equal(c.action, 'favorite');
+});
+
+test('9. a post with one full topic and one open topic is shown (multi-topic rescue)', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  for (let i = 0; i < 3; i++) T.recordInteraction(p, s, post(['oil painting']), 'like', now - DAY);
+  const marvel = run(p, s, Array.from({ length: 6 }, () => post(['marvel'])));
+  assert.equal(marvel.at(-1).action, 'collapse');
+  const [mixed] = run(p, s, [post(['marvel', 'oil painting'])]);
+  assert.equal(mixed.action, 'show');
+  assert.match(mixed.reason, /#oil painting/);
+});
+
+test('10. fast-skipping a topic cools it down for the session', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  for (let i = 0; i < 30; i++) T.recordInteraction(p, s, post(['anime']), 'like', now - 3 * DAY);
+  T.recordInteraction(p, s, post(['cats']), 'like', now - 3 * DAY);
+  const before = T.quotaFn(p, now)('anime');
+  for (let i = 0; i < 3; i++) T.recordInteraction(p, s, post(['anime']), 'skip', now);
+  const after = T.quotaFn(p, now)('anime');
+  assert.ok(after < before, `quota ${before} -> ${after}`);
+  assert.ok(T.quotaFn(p, now + 3 * 60 * 6e4)('anime') === before, 'debt wears off after a few hours');
+});
+
+test('11. one exploration slot in ten rescues a novel topic', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  s.shown = 9; // next shown post is the 10th
+  run(p, s, [post(['new thing']), post(['new thing'])]); // both topic slots used
+  s.shown = 9;
+  const [d] = run(p, s, [post(['new thing'])]);
+  assert.equal(d.action, 'explore');
+  assert.match(d.reason, /fresh pick: exploring #new thing/);
+});
+
+test('every decision explains itself in one line', () => {
+  const ds = run(T.emptyProfile(), T.newSession(), Array.from({ length: 30 }, (_, i) => post([`t${i % 4}`, 'shared'], `b${i % 7}`)));
+  for (const d of ds) assert.ok(d.reason && !d.reason.includes('\n') && !/undefined|NaN/.test(d.reason), d.reason);
 });
