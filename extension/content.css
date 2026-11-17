@@ -8,7 +8,9 @@ aside div:has(> div > div > [id^="aditude"]) {
 
 /* "Go Premium" / "Go Ad-Free" buttons: matched by Tumblr's premium-diamond icon or link,
    only in nav/sidebar/top bar so premium badges inside posts stay. */
-:is(.tn-hide-premium) :is(nav, aside, header[role="banner"], [role="navigation"]) :is(a, button, li):is(:has(use[href*="premium"]), [href*="/premium"], [href*="ad-free"]) {
+.tn-hide-premium :is(nav, aside, header[role="banner"], [role="navigation"]) :is(a, button, li):is(:has(use[href*="premium"]), [href*="/premium"], [href*="ad-free"]),
+.tn-hide-premium [data-testid="controlled-popover-wrapper"]:has(button[aria-label*="premium" i]),
+.tn-hide-premium button[aria-label*="premium" i]:not(article *) {
   display: none !important;
 }
 

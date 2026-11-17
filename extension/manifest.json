@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "tumblr-new",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Tumblr without ads, a feed that remembers more than your last like, and never miss a post from your mutuals.",
   "permissions": ["storage", "alarms", "declarativeNetRequest"],
   "host_permissions": ["https://*.tumblr.com/*"],
