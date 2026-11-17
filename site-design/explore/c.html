@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dashwell · c</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--ground:#f3f4f2;--ink:#141513;--ink2:#5a5d58;--sig:#ff5a1f;--rail:#d9dbd6;color-scheme:light}
+*{box-sizing:border-box}body{margin:0;background:var(--ground);color:var(--ink);font:17px/1.55 "Atkinson Hyperlegible",system-ui,sans-serif}
+nav{display:flex;justify-content:space-between;align-items:center;padding:20px clamp(20px,5vw,64px)}nav b{font:800 26px "Big Shoulders Display"}nav a{color:var(--ink)}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:end;padding:4vh clamp(20px,5vw,64px) 8vh;min-height:78vh}
+h1{font:800 clamp(56px,8vw,128px)/.88 "Big Shoulders Display";margin:0 0 20px}
+.lede{color:var(--ink2);max-width:36ch;margin:0 0 28px}.btn{display:inline-flex;align-items:center;min-height:48px;padding:0 22px;background:var(--ink);color:#fff;text-decoration:none;font-weight:700;border-radius:6px;margin:0 8px 8px 0}.btn.alt{background:none;color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
+.desk{display:flex;gap:22px;align-items:flex-end;height:min(56vh,460px);padding:24px;border-radius:10px;background:#fff;box-shadow:0 1px 0 #0000000d,0 18px 40px #00000012}
+.ch{flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;height:100%}
+.rail{position:relative;flex:1;width:6px;border-radius:3px;background:var(--rail)}
+.knob{position:absolute;left:50%;width:34px;height:18px;margin-left:-17px;border-radius:4px;background:var(--ink);transition:bottom 900ms cubic-bezier(.2,.8,.2,1)}
+.ch.hot .knob{background:var(--sig)}.ch small{font-size:13px;color:var(--ink2);text-align:center;line-height:1.2}
+.next{padding:0 clamp(20px,5vw,64px) 10vh}.next h2{font:800 44px/1 "Big Shoulders Display";margin:0 0 10px}
+@media(max-width:820px){.hero{grid-template-columns:1fr}.desk{height:300px;gap:12px}}
+@media(prefers-reduced-motion:reduce){.knob{transition:none}}
+</style></head><body>
+<nav><b>dashwell</b><a href="#">github</a></nav>
+<section class="hero"><div><h1>every topic gets its fair share of your dash.</h1>
+<p class="lede">dashwell balances your tumblr feed like a mixing desk, so one like can't drown out everything else. ads gone. mutuals never buried.</p>
+<a class="btn" href="#">get the extension</a><a class="btn alt" href="#">android apk</a></div>
+<div class="desk" aria-hidden="true">
+<div class="ch hot" id="c0"><div class="rail"><div class="knob" style="bottom:85%"></div></div><small>#visionquest</small></div>
+<div class="ch" id="c1"><div class="rail"><div class="knob" style="bottom:30%"></div></div><small>#art</small></div>
+<div class="ch" id="c2"><div class="rail"><div class="knob" style="bottom:22%"></div></div><small>#books</small></div>
+<div class="ch" id="c3"><div class="rail"><div class="knob" style="bottom:18%"></div></div><small>#cats</small></div>
+<div class="ch" id="c4"><div class="rail"><div class="knob" style="bottom:26%"></div></div><small>@mutuals</small></div></div></section>
+<section class="next"><h2>one black hole post. that was it.</h2><p>tumblr flooded you. dashwell gives it two slots and moves on.</p></section>
+<script>
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const flood = [85, 30, 22, 18, 26], fair = [34, 30, 26, 24, 40];
+let s = 0;
+function go() {
+  s ^= 1;
+  (s ? fair : flood).forEach((b, i) => {
+    document.querySelector('#c' + i + ' .knob').style.bottom = b + '%';
+    document.getElementById('c' + i).classList.toggle('hot', !s && i === 0);
+  });
+}
+if (!still) setInterval(go, 2600);
+</script></body></html>

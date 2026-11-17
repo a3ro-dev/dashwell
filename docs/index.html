@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashwell · your tumblr dash, done well</title>
+<meta name="description" content="a free extension and android app for tumblr. blocks the ads, stops one like from flooding your feed, and makes sure you never miss your mutuals. nothing leaves your device.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#07131a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta property="og:title" content="Dashwell · your tumblr dash, done well">
+<meta property="og:description" content="one like shouldn't flood your whole dash. no ads, a varied feed, never miss a mutual.">
+<meta property="og:image" content="https://a3ro-dev.github.io/dashwell/media/feed-poster.jpg">
+<meta property="og:url" content="https://a3ro-dev.github.io/dashwell/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preload" href="fonts/bricolage.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face { font-family: "Bricolage"; src: url("fonts/bricolage.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+@font-face { font-family: "Bricolage Fallback"; src: local("Arial"), local("Liberation Sans"), local("Arimo"), local("Helvetica"); size-adjust: 91.47%; ascent-override: 101.67%; descent-override: 29.52%; line-gap-override: 0%; }
+:root {
+  --ground: #07131a;      /* deep well water */
+  --raised: #0f2028;
+  --line: #ffffff1a;
+  --ink: #e9f1f2;
+  --ink-2: #a7bcc0;       /* tinted from the water */
+  --lamp: #f4d35e;        /* one job: the primary action and the mark's dash */
+  --pad: clamp(20px, 5vw, 64px);
+  --max: 1200px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--ground); color: var(--ink); font: 17px/1.6 "Bricolage", "Bricolage Fallback", system-ui, sans-serif; font-optical-sizing: auto; }
+::selection { background: var(--lamp); color: var(--ground); }
+a { color: inherit; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--lamp); outline-offset: 3px; border-radius: 6px; }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 var(--pad); }
+
+/* nav */
+.top { display: flex; align-items: center; justify-content: space-between; padding-top: 22px; padding-bottom: 22px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; text-decoration: none; }
+.brand svg { width: 30px; height: 30px; color: var(--ink); }
+.top nav { display: flex; gap: 24px; font-size: 15px; color: var(--ink-2); }
+.top nav a { text-decoration: none; }
+.top nav a:hover { color: var(--ink); text-decoration: underline; }
+
+/* hero */
+.hero { display: grid; grid-template-columns: 1.08fr .92fr; gap: clamp(24px, 4vw, 56px); align-items: center; min-height: min(82vh, 820px); padding-bottom: 72px; }
+h1 { font-size: clamp(44px, 5.8vw, 84px); line-height: .97; letter-spacing: -0.04em; font-weight: 800; margin: 0 0 24px; text-wrap: balance; }
+.lede { font-size: clamp(18px, 1.5vw, 21px); color: var(--ink-2); max-width: 36ch; margin: 0 0 32px; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; min-height: 50px; padding: 0 22px; border-radius: 12px; font-weight: 650; text-decoration: none; transition: transform 160ms cubic-bezier(.2,.8,.2,1), background-color 160ms; }
+.btn.primary { background: var(--lamp); color: var(--ground); }
+.btn.primary:hover { background: #f8de7f; }
+.btn.ghost { box-shadow: inset 0 0 0 1.5px #ffffff3d; }
+.btn.ghost:hover { box-shadow: inset 0 0 0 1.5px #ffffff80; }
+.btn:active { transform: translateY(1px); }
+.btn svg { width: 18px; height: 18px; }
+.small { margin: 16px 0 0; font-size: 14px; color: var(--ink-2); }
+
+/* the well (signature) */
+.well { position: relative; width: 100%; max-width: 540px; aspect-ratio: 1; justify-self: end; }
+.well canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fold { position: absolute; left: 5%; right: 5%; top: 43%; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 14px 14px 20px; border-radius: 16px; background: var(--raised); box-shadow: 0 18px 40px #00000059; font-size: 16px; animation: drop 7s cubic-bezier(.2,.8,.2,1) infinite; }
+.fold b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fold span { flex: none; padding: 7px 16px; border-radius: 18px; background: #ffffff17; font-weight: 650; }
+@keyframes drop { 0% { transform: translateY(-120px); opacity: 0; } 14% { transform: translateY(0); opacity: 1; } 82% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(16px); opacity: 0; } }
+
+/* sections */
+section.block { padding: 96px 0; border-top: 1px solid var(--line); }
+h2 { font-size: clamp(30px, 3.6vw, 52px); line-height: 1.04; letter-spacing: -0.03em; font-weight: 800; margin: 0 0 18px; max-width: 20ch; text-wrap: balance; }
+.sub { color: var(--ink-2); max-width: 52ch; margin: 0; font-size: 19px; }
+.works { display: grid; grid-template-columns: .9fr 1.1fr; gap: clamp(28px, 5vw, 80px); align-items: start; margin-top: 48px; }
+.clip { border-radius: 22px; overflow: hidden; background: var(--raised); aspect-ratio: 4 / 5; }
+.clip video, .clip img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.fixes { list-style: none; margin: 0; padding: 0; }
+.fixes li { padding: 18px 0; border-bottom: 1px solid var(--line); font-size: 19px; line-height: 1.45; }
+.fixes li:first-child { padding-top: 0; }
+.fixes b { font-weight: 700; }
+.fixes span { display: block; color: var(--ink-2); font-size: 16px; margin-top: 4px; }
+
+.look { display: grid; grid-template-columns: 1fr minmax(0, 360px); gap: clamp(28px, 6vw, 96px); align-items: center; }
+.look figure { margin: 0; }
+.look img { display: block; width: 100%; height: auto; border-radius: 26px; box-shadow: 0 0 0 1px var(--line), 0 30px 60px #00000066; }
+.look figcaption { margin-top: 14px; color: var(--ink-2); font-size: 15px; }
+
+.how p { max-width: 62ch; font-size: 19px; color: var(--ink-2); margin: 0 0 18px; }
+.how p:first-of-type { color: var(--ink); }
+.how code { font-size: .92em; padding: 2px 6px; border-radius: 6px; background: var(--raised); }
+
+.install { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(28px, 5vw, 80px); margin-top: 48px; }
+.install h3 { margin: 0 0 14px; font-size: 22px; letter-spacing: -0.01em; }
+.install ol { margin: 0 0 22px; padding-left: 22px; color: var(--ink-2); }
+.install li { margin-bottom: 8px; }
+.install li::marker { color: var(--ink); font-weight: 700; }
+.note { font-size: 15px; color: var(--ink-2); max-width: 46ch; }
+
+footer { border-top: 1px solid var(--line); padding: 40px 0 56px; color: var(--ink-2); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px 40px; }
+footer nav { display: flex; flex-wrap: wrap; gap: 18px; }
+footer p { margin: 0; max-width: 60ch; }
+
+@media (max-width: 860px) {
+  .hero { grid-template-columns: 1fr; min-height: 0; padding-top: 8px; }
+  .well { justify-self: center; max-width: 420px; order: 2; }
+  .works, .install, .look { grid-template-columns: 1fr; }
+  .look figure { max-width: 340px; }
+  .clip { max-width: 440px; }
+  .top nav .hide-sm { display: none; }
+}
+@media (max-width: 520px) {
+  .fold { font-size: 14px; left: 4%; right: 4%; }
+  section.block { padding: 72px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fold { animation: none; }
+  .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+<header class="wrap top">
+  <a class="brand" href="./" aria-label="Dashwell home">
+    <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="19" r="15" fill="none" stroke="currentColor" stroke-width="4.5"/><rect x="11" y="22.5" width="18" height="4.5" rx="2.25" fill="#f4d35e"/></svg>
+    dashwell
+  </a>
+  <nav aria-label="Site">
+    <a class="hide-sm" href="#how">how it works</a>
+    <a href="#install">install</a>
+    <a href="https://github.com/a3ro-dev/dashwell">github</a>
+  </nav>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div>
+      <h1>one like shouldn't flood your whole dash.</h1>
+      <p class="lede">dashwell is a little extension and android app for tumblr. it blocks the ads, stops your feed turning into one topic, and makes sure you never miss your mutuals. no account, no api key, nothing leaves your device.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/a3ro-dev/dashwell/releases/latest/download/Dashwell.apk">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+          android app
+        </a>
+        <a class="btn ghost" href="#install">browser extension</a>
+      </div>
+      <p class="small">free and open source · works on chrome, comet, edge, brave and firefox</p>
+    </div>
+    <div class="well" aria-hidden="true">
+      <canvas id="well"></canvas>
+      <div class="fold"><b>you've seen a lot of #visionquest lately</b><span>show</span></div>
+    </div>
+  </div>
+
+  <section class="block">
+    <div class="wrap">
+      <h2>you liked one black hole post and tumblr made it your whole personality.</h2>
+      <p class="sub">and it forgets everything you liked before that. dashwell remembers, and keeps the rest of your dash around.</p>
+      <div class="works">
+        <div class="clip">
+          <video src="media/feed.mp4" poster="media/feed-poster.jpg" autoplay muted loop playsinline preload="metadata" aria-label="a tumblr feed scrolling: the sponsored post disappears, and the third #visionquest post in a row folds into one line that says you've seen a lot of #visionquest lately, with a show button"></video>
+        </div>
+        <ul class="fixes">
+          <li><b>ads and sponsored posts, gone.</b><span>blocked before they load, using the same lists ad blockers use.</span></li>
+          <li><b>a topic you've seen a lot lately folds into one line.</b><span>nothing gets deleted, tap show and it's there. tapping show teaches it too.</span></li>
+          <li><b>your old interests stay.</b><span>a fresh like doesn't wipe out months of what you actually like.</span></li>
+          <li><b>mutuals never get folded.</b><span>it notices the blogs you always like, even the quiet ones, and lets them through.</span></li>
+          <li><b>following stays chronological.</b><span>but if someone goes on a 20-post reblog spree, it folds after 3.</span></li>
+          <li><b>mute words, #tags and @blogs.</b><span>a muted blog gets caught inside other people's reblogs too, which tumblr's block doesn't do.</span></li>
+          <li><b>no "check out these communities", no go premium, no "rather use the app?"</b></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="look">
+        <div>
+          <h2>it still looks like tumblr, because it is tumblr.</h2>
+          <p class="sub">it doesn't reskin anything. normal posts look exactly the same, and the only new thing is a calm line where a post got folded. everything else lives in one small settings page, in plain words, so you can switch any of it off.</p>
+        </div>
+        <figure>
+          <img src="media/phone-settings.png" width="540" height="1843" loading="lazy" alt="dashwell's settings: new posts from favorites, feed switches, favorite blogs and muted words">
+          <figcaption>the settings, all of them</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="block how" id="how">
+    <div class="wrap">
+      <h2>how it decides what to fold</h2>
+      <p>it's not ai and it doesn't phone home. it's a small bit of javascript that runs on your device and keeps a note of the tags you scroll past, like and reblog.</p>
+      <p>every topic gets a fair share of your dash based on what you've liked over months, not your last tap, so one like on something new gets maybe 2 posts in every 16 instead of your entire evening. if you keep scrolling past something it cools down for a bit, and if you like three posts about a new show in one go it figures that's a real new obsession and lets it in. it also works out that #black holes and #space are basically the same topic from how people tag things, which honestly was the fun part.</p>
+      <p>the maths comes from actual recommender research (calibrated recommendations, satiation, tie strength) and the whole thing is in <code>feed.js</code> if you want to read it.</p>
+    </div>
+  </section>
+
+  <section class="block" id="install">
+    <div class="wrap">
+      <h2>install it</h2>
+      <p class="sub">both are free. both tell you when there's an update.</p>
+      <div class="install">
+        <div>
+          <h3>android</h3>
+          <ol>
+            <li>download <a href="https://github.com/a3ro-dev/dashwell/releases/latest/download/Dashwell.apk">Dashwell.apk</a> and open it</li>
+            <li>allow installing from your browser if your phone asks</li>
+            <li>log in to tumblr inside the app, once. it stays logged in across updates</li>
+          </ol>
+          <p class="note">google and apple sign-in don't work inside apps (they block it). on the login screen tap "forgot password" with your google email to set a password, then log in with that.</p>
+        </div>
+        <div>
+          <h3>browser</h3>
+          <ol>
+            <li>download <a href="https://github.com/a3ro-dev/dashwell/releases/latest/download/Dashwell-extension.zip">Dashwell-extension.zip</a> and unzip it</li>
+            <li>open <code>chrome://extensions</code> and turn on developer mode</li>
+            <li>click load unpacked and pick the folder. open your dash</li>
+          </ol>
+          <p class="note">on firefox it's about:debugging, then load temporary add-on, then pick manifest.json.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <nav aria-label="Legal">
+      <a href="https://github.com/a3ro-dev/dashwell/blob/main/PRIVACY.md">privacy</a>
+      <a href="https://github.com/a3ro-dev/dashwell/blob/main/TERMS.md">terms</a>
+      <a href="https://github.com/a3ro-dev/dashwell/blob/main/LICENSE">licence (apache-2.0)</a>
+      <a href="https://github.com/a3ro-dev/dashwell">source</a>
+    </nav>
+    <p>dashwell isn't made by or affiliated with tumblr or automattic. tumblr is a trademark of automattic inc. made by <a href="https://a3ro.dev">a3ro-dev</a> (<a href="https://github.com/a3ro-dev">github</a>).</p>
+  </div>
+</footer>
+
+<script>
+// The well: slow ripples spreading from where the folded post lands. Paused off-screen,
+// one still frame for reduced motion. Content never depends on this.
+(() => {
+  const canvas = document.getElementById('well');
+  const ctx = canvas.getContext('2d');
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const LOOP = 7000; // matches the .fold animation
+  let size = 0, visible = true, start = performance.now();
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    size = r.width;
+    canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function draw(now) {
+    const s = size, cx = s / 2, cy = s * 0.5;
+    ctx.clearRect(0, 0, s, s);
+    // resting rings: the well
+    for (let i = 1; i <= 7; i++) {
+      ctx.beginPath(); ctx.arc(cx, cy, (s / 2) * (i / 7.4), 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(167,188,192,' + (0.05 + 0.05 * (1 - i / 7)) + ')'; ctx.lineWidth = 1; ctx.stroke();
+    }
+    if (still) return;
+    // a ripple spreads each time the post lands (14% into the loop)
+    const t = ((now - start) % LOOP) / LOOP - 0.14;
+    if (t > 0) {
+      for (let k = 0; k < 3; k++) {
+        const p = t * 2.2 - k * 0.16;
+        if (p <= 0 || p >= 1) continue;
+        const r = (s / 2) * (0.12 + p * 0.88);
+        ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.98, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(233,241,242,' + (0.42 * (1 - p) * (1 - p)) + ')'; ctx.lineWidth = 1.5; ctx.stroke();
+      }
+    }
+    if (visible) requestAnimationFrame(draw);
+  }
+  resize(); addEventListener('resize', () => { resize(); if (still) draw(0); });
+  new IntersectionObserver(([e]) => { const was = visible; visible = e.isIntersecting; if (visible && !was && !still) requestAnimationFrame(draw); }).observe(canvas);
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
