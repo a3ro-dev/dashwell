@@ -61,6 +61,9 @@ public class MainActivity extends Activity {
     private static final Pattern RSS_URL = Pattern.compile("^https://[\\w-]+\\.tumblr\\.com/rss$");
     private static final Pattern STORAGE_KEY = Pattern.compile("^[A-Za-z0-9_-]{1,64}$");
     private static final int FILE_REQUEST = 42;
+    // Public half of the OTA signing key (scripts/ota.mjs holds the private half). OTA_FILES must match that script.
+    private static final String OTA_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEAoIW8FVb2NZcmjPMEGGucY20lesyWDLibfIWy7sefYaujR6MC6zQtQ/DtiPkxISs3Zh0nU9waWFoJkdEprOrYg==";
+    private static final List<String> OTA_FILES = java.util.Arrays.asList("feed.js", "content.js", "content.css", "cosmetic.css");
     private static final int MAX_RSS_BYTES = 2 << 20;
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
@@ -255,6 +258,7 @@ public class MainActivity extends Activity {
             JSONObject rel = new JSONObject(body);
             String latest = rel.getString("tag_name").replaceFirst("^v", "");
             if (!isNewer(latest, appVersion())) return;
+            if (applyOta(rel, latest, prefs)) return; // content-only release: applied silently on next launch
             JSONArray assets = rel.optJSONArray("assets");
             String apk = null;
             for (int i = 0; assets != null && i < assets.length(); i++) {
@@ -272,6 +276,68 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {
         } finally {
             if (c != null) c.disconnect();
+        }
+    }
+
+    // Over-the-air content: the release's signed ota.json carries the page scripts and CSS. Anything that
+    // fails (download, signature, version, missing file) returns false and the APK dialog takes over.
+    private boolean applyOta(JSONObject rel, String latest, android.content.SharedPreferences prefs) {
+        String jsonUrl = null, sigUrl = null;
+        JSONArray assets = rel.optJSONArray("assets");
+        for (int i = 0; assets != null && i < assets.length(); i++) {
+            JSONObject a = assets.optJSONObject(i);
+            if (a == null) continue;
+            if (a.optString("name").equals("ota.json")) jsonUrl = a.optString("browser_download_url");
+            if (a.optString("name").equals("ota.json.sig")) sigUrl = a.optString("browser_download_url");
+        }
+        if (jsonUrl == null || sigUrl == null) return false;
+        try {
+            String have = prefs.getString("ota", null);
+            if (latest.equals(have)) return true;
+            byte[] body = download(jsonUrl), sig = download(sigUrl);
+            java.security.Signature s = java.security.Signature.getInstance("SHA256withECDSA");
+            s.initVerify(java.security.KeyFactory.getInstance("EC").generatePublic(
+                    new java.security.spec.X509EncodedKeySpec(android.util.Base64.decode(OTA_KEY, android.util.Base64.DEFAULT))));
+            s.update(body);
+            if (!s.verify(sig)) return false;
+            JSONObject m = new JSONObject(new String(body, StandardCharsets.UTF_8));
+            // version must be the release's own (no replaying an older signed file); minApp = needs a newer APK
+            if (!latest.equals(m.getString("version")) || isNewer(m.getString("minApp"), appVersion())) return false;
+            JSONObject files = m.getJSONObject("files");
+            File dir = new File(getFilesDir(), "ota-" + latest);
+            dir.mkdirs();
+            for (String n : OTA_FILES) Files.write(new File(dir, n).toPath(), files.getString(n).getBytes(StandardCharsets.UTF_8));
+            prefs.edit().putString("ota", latest).apply();
+            File[] old = getFilesDir().listFiles((d, n) -> n.startsWith("ota-") && !n.equals("ota-" + latest));
+            if (old != null) for (File d : old) {
+                File[] fs = d.listFiles();
+                if (fs != null) for (File f : fs) f.delete();
+                d.delete();
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private byte[] download(String url) throws IOException {
+        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+        try {
+            c.setConnectTimeout(10000);
+            c.setReadTimeout(20000);
+            if (c.getResponseCode() != 200) throw new IOException("http " + c.getResponseCode());
+            try (InputStream in = c.getInputStream()) {
+                ByteArrayOutputStream buf = new ByteArrayOutputStream();
+                byte[] chunk = new byte[16384];
+                int n;
+                while ((n = in.read(chunk)) > 0) {
+                    buf.write(chunk, 0, n);
+                    if (buf.size() > 4 << 20) throw new IOException("too big");
+                }
+                return buf.toByteArray();
+            }
+        } finally {
+            c.disconnect();
         }
     }
 
@@ -529,6 +595,14 @@ public class MainActivity extends Activity {
     }
 
     private String asset(String name) {
+        // Over-the-air content (see applyOta) wins over the bundled copy, but only while it is newer than this APK.
+        String ota = getSharedPreferences("updates", MODE_PRIVATE).getString("ota", null);
+        if (ota != null && OTA_FILES.contains(name) && isNewer(ota, appVersion())) {
+            try {
+                return new String(Files.readAllBytes(new File(getFilesDir(), "ota-" + ota + "/" + name).toPath()), StandardCharsets.UTF_8);
+            } catch (IOException ignored) { // fall through to the bundled copy
+            }
+        }
         try (InputStream in = getAssets().open(name)) {
             ByteArrayOutputStream buf = new ByteArrayOutputStream();
             byte[] chunk = new byte[16384];

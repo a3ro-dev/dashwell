@@ -7,8 +7,8 @@ android {
         applicationId = "dev.a3ro.dashwell"
         minSdk = 24
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.1.3"
+        versionCode = 6
+        versionName = "1.1.4"
     }
     // The extension is the single source of truth: its files ship as app assets.
     sourceSets["main"].assets.srcDirs("src/main/assets", "../../extension")
