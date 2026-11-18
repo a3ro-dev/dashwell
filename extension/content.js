@@ -189,6 +189,35 @@ function scan() {
   mountAppButton();
 }
 
+// Tumblr's feed sometimes stalls at the bottom until you refresh. When we sit at the end with no new
+// posts, nudge it, press any "try again" button, and on For you reload as a last resort (2 min cooldown).
+// shortcut: guessed from behaviour, not Tumblr's markup; if it misfires, tune the thresholds here.
+let lastCount = 0;
+let stuckSince = 0;
+let lastStage = 0;
+setInterval(() => {
+  const n = document.querySelectorAll(ARTICLE).length;
+  const el = document.scrollingElement;
+  const atEnd = el.scrollTop + innerHeight >= el.scrollHeight - 400;
+  if (!onFeed() || document.hidden || n !== lastCount || !atEnd) {
+    lastCount = n;
+    stuckSince = lastStage = 0;
+    return;
+  }
+  stuckSince ||= Date.now();
+  const stage = Math.floor((Date.now() - stuckSince) / 4000);
+  if (stage === lastStage || stage < 1) return;
+  lastStage = stage;
+  if (stage < 3) {
+    [...document.querySelectorAll('main button, [role="main"] button')].find((b) => /try again|retry|refresh|load more/i.test(b.textContent))?.click();
+    el.scrollBy(0, -300);
+    setTimeout(() => el.scrollTo(0, el.scrollHeight), 250);
+  } else if (!location.pathname.startsWith('/dashboard/following') && Date.now() - (+sessionStorage.tnReload || 0) > 120000) {
+    sessionStorage.tnReload = Date.now();
+    location.reload();
+  }
+}, 2000);
+
 function applySettings() {
   const html = document.documentElement.classList;
   html.toggle('tn-hide-premium', settings.hidePremium);
