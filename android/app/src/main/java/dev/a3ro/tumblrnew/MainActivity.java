@@ -374,9 +374,22 @@ public class MainActivity extends Activity {
     protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
         if (request == FILE_REQUEST && fileCallback != null) {
-            fileCallback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
+            fileCallback.onReceiveValue(pickedUris(result, data));
             fileCallback = null;
         }
+    }
+
+    // WebChromeClient.FileChooserParams.parseResult returned null for this phone's photo picker (a ClipData
+    // result), so the page never got the file. Read the result ourselves.
+    private static Uri[] pickedUris(int result, Intent data) {
+        if (result != RESULT_OK || data == null) return null;
+        android.content.ClipData clip = data.getClipData();
+        if (clip != null) {
+            List<Uri> out = new ArrayList<>();
+            for (int i = 0; i < clip.getItemCount(); i++) if (clip.getItemAt(i).getUri() != null) out.add(clip.getItemAt(i).getUri());
+            if (!out.isEmpty()) return out.toArray(new Uri[0]);
+        }
+        return data.getData() != null ? new Uri[] {data.getData()} : WebChromeClient.FileChooserParams.parseResult(result, data);
     }
 
     // ---- settings sheet (the extension popup) ----
