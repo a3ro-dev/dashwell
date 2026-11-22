@@ -88,3 +88,31 @@ article.tn-collapsed > :not(.tn-bar) { display: none !important; }
   color: #000;
   background: rgb(0 184 255);
 }
+
+/* "Less like this" in Tumblr's ••• menu inherits Tumblr's item classes; this is only the fallback. */
+.tn-menu-item { cursor: pointer; }
+
+/* Android app: touch sizing. 44 px targets, no grey tap flash, no overscroll glow fighting pull-to-refresh. */
+html.tn-app { overscroll-behavior-y: none; }
+.tn-app .tn-bar button, .tn-app .tn-app-btn { min-height: 44px; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.tn-app .tn-bar { padding-top: 8px; padding-bottom: 8px; }
+.tn-pull {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  z-index: 100;
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(var(--black, 255 255 255), 0.25);
+  border-top-color: rgb(var(--blue, 0 184 255));
+  border-radius: 50%;
+  background: rgb(var(--white, 0 25 53));
+  box-shadow: 0 2px 8px #0006;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -48px);
+}
+.tn-pull.tn-ready { border-color: rgb(var(--blue, 0 184 255)); }
+.tn-pull.tn-spin { animation: tn-spin 700ms linear infinite; }
+@keyframes tn-spin { from { transform: translate(-50%, 48px) rotate(0); } to { transform: translate(-50%, 48px) rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .tn-pull.tn-spin { animation: none; } }

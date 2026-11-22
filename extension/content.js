@@ -5,10 +5,12 @@ const ARTICLE = '[data-id] article';
 const SPONSORED = ':is([data-cell-id], [data-id]):is(:has(.iab_sf), :has(a[href*="/relevantads"])), aside div:has(> div > div > [id^="aditude"])';
 const DEFAULTS = { hidePremium: true, shapeFeed: true, hideSuggestions: true, followingFirst: false };
 const FAST_SKIP_MS = 300;
+const DWELL_MS = [4000, 60000]; // read for 4 s+; past a minute the phone was probably put down
 
 const session = T.newSession();
-const decisions = new Map(); // post id -> decision; Tumblr's list re-mounts posts on scroll
+const decisions = new Map(); // tab + post id -> decision; Tumblr's list re-mounts posts on scroll
 const posts = new Map(); // post id -> parsed post
+const learned = new Set(); // post id + kind, so a like counts once even if click and key both fire
 const ads = new Set();
 let engine = T.emptyProfile();
 let pinned = [];
@@ -20,6 +22,9 @@ let dirty = false;
 // The logged-in home is "/" or "/dashboard..."; tag and blog pages are skipped because
 // every post there shares a topic or an author and would all collapse.
 const onFeed = () => location.pathname === '/' || location.pathname.startsWith('/dashboard');
+const onFollowing = () => location.pathname.startsWith('/dashboard/following');
+// Following is chronological: For you's topic folds must not follow a post there.
+const keyOf = (id) => (onFollowing() ? 'f:' : 'y:') + id;
 
 function readPost(article) {
   const id = article.closest('[data-id]')?.dataset.id;
@@ -54,12 +59,15 @@ setInterval(() => {
 addEventListener('visibilitychange', () => document.hidden && dirty && (chrome.storage.local.set({ engine }), (dirty = false)));
 
 function learn(post, kind) {
+  const k = `${post.id}:${kind}`;
+  if (learned.has(k)) return;
+  learned.add(k);
   T.recordInteraction(engine, session, post, kind, Date.now());
   save();
 }
 
 function render(article, post, d) {
-  if (d.action !== 'collapse' || d.shown || !settings.shapeFeed || article.querySelector('.tn-bar')) return;
+  if (d.action !== 'collapse' || d.shown || !(settings.shapeFeed || d.byUser) || article.querySelector('.tn-bar')) return;
   article.classList.add('tn-collapsed');
   const bar = document.createElement('div');
   bar.className = 'tn-bar';
@@ -67,7 +75,7 @@ function render(article, post, d) {
   text.textContent = d.say ?? 'Hidden to keep your feed varied';
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.textContent = 'Show';
+  btn.textContent = d.byUser ? 'Undo' : 'Show';
   btn.setAttribute('aria-label', `Show hidden post from @${post.blog ?? 'unknown'}`);
   btn.onclick = () => {
     d.shown = true;
@@ -80,7 +88,18 @@ function render(article, post, d) {
 }
 
 // Fast-skip = a post that was on screen for under 300 ms: a quiet "not now" for its topics.
+// A thumb fling or End key sends many posts past at once; that's getting somewhere, not judging them.
 const visibleSince = new Map();
+let skips = [];
+let skipTimer = 0;
+function queueSkip(post) {
+  skips.push(post);
+  clearTimeout(skipTimer);
+  skipTimer = setTimeout(() => {
+    if (skips.length < 4) for (const x of skips) learn(x, 'skip');
+    skips = [];
+  }, 700);
+}
 const skipWatcher = new IntersectionObserver((entries) => {
   for (const e of entries) {
     const id = e.target.closest('[data-id]')?.dataset.id;
@@ -89,11 +108,51 @@ const skipWatcher = new IntersectionObserver((entries) => {
     else if (visibleSince.has(id)) {
       const ms = e.time - visibleSince.get(id);
       visibleSince.delete(id);
-      const d = decisions.get(id);
-      if (ms < FAST_SKIP_MS && d && d.action !== 'collapse' && posts.has(id)) learn(posts.get(id), 'skip');
+      const d = decisions.get(keyOf(id));
+      if (!d || d.action === 'collapse' || !posts.has(id)) continue;
+      if (ms < FAST_SKIP_MS) queueSkip(posts.get(id));
+      else if (ms >= DWELL_MS[0] && ms <= DWELL_MS[1] && !document.hidden) learn(posts.get(id), 'dwell');
     }
   }
 }, { threshold: 0.5 });
+
+// "Less like this": fold the post now with an undo and cool its topics. From the H key or Tumblr's ••• menu.
+function hidePost(article, post) {
+  if (!article || article.classList.contains('tn-collapsed')) return;
+  const d = { action: 'collapse', byUser: true, say: "Hidden. You'll see less like this", reason: 'hidden by you' };
+  decisions.set(keyOf(post.id), d);
+  render(article, post, d);
+  learn(post, 'hide');
+  // a tall post folding above the fold would yank the feed up; keep the Undo line in view instead
+  const top = article.getBoundingClientRect().top;
+  if (top < 64) scrollBy(0, top - 64);
+}
+
+// Tumblr's ••• menu opens in a dialog outside the post; its first item links to the post, which names it.
+function addMenuItem() {
+  for (const menu of document.querySelectorAll('[role="dialog"] [role="menu"]:not([data-tn])')) {
+    menu.dataset.tn = '1';
+    const id = menu.querySelector('a[href]')?.getAttribute('href').match(/^(?:https:\/\/www\.tumblr\.com)?\/[\w-]+\/(\d{6,})/)?.[1];
+    const article = id && document.querySelector(`[data-id="${id}"] article`);
+    if (!article || !posts.has(id) || article.classList.contains('tn-collapsed')) continue;
+    const like = menu.querySelector('div[role="menuitem"]'); // borrow Tumblr's own item look
+    const item = document.createElement('div');
+    item.setAttribute('role', 'menuitem');
+    item.tabIndex = -1;
+    item.className = `${like?.className ?? ''} tn-menu-item`;
+    const label = document.createElement('span');
+    label.className = like?.firstElementChild?.className ?? '';
+    label.textContent = 'Less like this';
+    item.append(label);
+    item.onclick = () => {
+      hidePost(article, posts.get(id));
+      menu.closest('[role="dialog"]')?.querySelector('[data-dialog-dismiss]')?.click();
+    };
+    item.onkeydown = (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), item.click());
+    const sep = menu.querySelector('hr');
+    menu.append(...(sep ? [sep.cloneNode(), item] : [item]));
+  }
+}
 
 // Android app only: our settings live behind an icon in Tumblr's own top bar, next to Search.
 const IS_APP = !!globalThis.__tnOpenSettings;
@@ -141,7 +200,7 @@ function hideAppNags() {
 function decideHere(post, now) {
   const muted = T.mutedBy(mutes, post);
   if (muted) return { action: 'collapse', reason: `muted: ${muted}`, say: `Muted: ${muted}` };
-  if (location.pathname.startsWith('/dashboard/following')) {
+  if (onFollowing()) {
     const n = followWindow.filter((b) => b === post.blog).length;
     if (n >= 3 && !pinned.includes(post.blog)) return { action: 'collapse', reason: `flood: @${post.blog}`, say: `@${post.blog} has posted a lot in a row` };
     followWindow.push(post.blog);
@@ -173,20 +232,56 @@ function scan() {
       article.dataset.tn = '1';
       const post = readPost(article);
       if (!post.id) continue;
-      if (!decisions.has(post.id)) {
+      const key = keyOf(post.id);
+      if (!decisions.has(key)) {
         const now = Date.now();
-        T.observe(engine, post, now);
-        const d = decideHere(post, now);
-        decisions.set(post.id, d);
+        if (!posts.has(post.id)) T.observe(engine, post, now);
+        decisions.set(key, decideHere(post, now));
         posts.set(post.id, post);
         save();
       }
-      render(article, post, decisions.get(post.id));
+      render(article, post, decisions.get(key));
       skipWatcher.observe(article);
     }
   }
+  addMenuItem();
   hideAppNags();
   mountAppButton();
+}
+
+// Android app only: pull down at the top of the feed to refresh, like the native app.
+// Releases past 72 px; Tumblr re-fetches on its own route reload, so we just reload the page.
+if (IS_APP) {
+  document.documentElement.classList.add('tn-app');
+  let startY = null;
+  let pull = 0;
+  const spinner = document.createElement('div');
+  spinner.className = 'tn-pull';
+  spinner.setAttribute('aria-hidden', 'true');
+  const set = (px) => {
+    pull = px;
+    spinner.style.transform = `translate(-50%, ${Math.min(px, 96) - 48}px) rotate(${px * 3}deg)`;
+    spinner.style.opacity = String(Math.min(px / 72, 1));
+    spinner.classList.toggle('tn-ready', px >= 72);
+  };
+  addEventListener('touchstart', (e) => {
+    startY = onFeed() && document.scrollingElement.scrollTop <= 0 && e.touches.length === 1 && !document.querySelector('[role="dialog"]') ? e.touches[0].clientY : null;
+  }, { passive: true });
+  addEventListener('touchmove', (e) => {
+    if (startY == null) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0 || document.scrollingElement.scrollTop > 0) return startY = null, set(0);
+    if (!spinner.isConnected) document.body.append(spinner);
+    set(dy * 0.5); // resistance, so it feels pulled rather than dragged
+  }, { passive: true });
+  addEventListener('touchend', () => {
+    if (startY == null) return;
+    startY = null;
+    if (pull >= 72) {
+      spinner.classList.add('tn-spin');
+      location.reload();
+    } else set(0);
+  }, { passive: true });
 }
 
 // Tumblr's feed sometimes stalls at the bottom until you refresh. When we sit at the end with no new
@@ -212,7 +307,7 @@ setInterval(() => {
     [...document.querySelectorAll('main button, [role="main"] button')].find((b) => /try again|retry|refresh|load more/i.test(b.textContent))?.click();
     el.scrollBy(0, -300);
     setTimeout(() => el.scrollTo(0, el.scrollHeight), 250);
-  } else if (!location.pathname.startsWith('/dashboard/following') && Date.now() - (+sessionStorage.tnReload || 0) > 120000) {
+  } else if (!onFollowing() && Date.now() - (+sessionStorage.tnReload || 0) > 120000) {
     sessionStorage.tnReload = Date.now();
     location.reload();
   }
@@ -239,6 +334,49 @@ document.addEventListener(
     const post = readPost(article);
     const kind = btn.ariaLabel === 'Reblog' ? 'reblog' : 'like';
     learn(post, kind);
+  },
+  true,
+);
+
+// Keyboard. Tumblr owns J K L R Q E W A D C S N F X Z . ? / so ours are O, H and G.
+// Tumblr's own L and R act on the current post without a click, so we learn from those keys too.
+// shortcut: "current post" = the focused one, else the first below the top bar; matches Tumblr's J/K in practice.
+function currentArticle() {
+  const focused = document.activeElement?.closest?.(ARTICLE);
+  if (focused) return focused;
+  return [...document.querySelectorAll(ARTICLE)].find((a) => a.getBoundingClientRect().bottom > 100);
+}
+const typing = (el) => el?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]');
+document.addEventListener(
+  'keydown',
+  (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || typing(e.target) || !onFeed() || document.querySelector('[role="dialog"]')) return;
+    const key = e.key.toLowerCase();
+    if (key === 'g' && !e.shiftKey) {
+      // switch For you <-> Following, through Tumblr's own tab link so the page doesn't reload
+      const to = onFollowing() ? '/dashboard/stuff_for_you' : '/dashboard/following';
+      const link = document.querySelector(`a[href="${to}"]`);
+      link ? link.click() : location.assign(to);
+      return e.preventDefault();
+    }
+    if (key === 'o' && !e.shiftKey) {
+      // show the nearest folded post on screen
+      const bar = [...document.querySelectorAll('article.tn-collapsed .tn-bar')].find((b) => {
+        const r = b.getBoundingClientRect();
+        return r.bottom > 0 && r.top < innerHeight;
+      });
+      bar?.querySelector('button').click();
+      return bar && e.preventDefault();
+    }
+    const article = currentArticle();
+    const post = article && readPost(article);
+    if (!post?.id) return;
+    if (key === 'h' && !e.shiftKey && !article.classList.contains('tn-collapsed')) {
+      hidePost(article, post);
+      return e.preventDefault();
+    }
+    if (key === 'l' && !e.shiftKey && article.querySelector('button[aria-label="Like"]')) learn(post, 'like');
+    if (key === 'r' && article.querySelector('button[aria-label="Reblog"]')) learn(post, 'reblog');
   },
   true,
 );
