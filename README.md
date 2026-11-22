@@ -19,6 +19,9 @@ Your Tumblr dashboard, done well. A browser extension and an Android app that fi
 - **No "Check out these communities", no "Go Premium", no "Rather use the app?" banners.**
 - **Real tab titles** ("Following · Tumblr", "#art · Tumblr") so browser history stops collapsing every page into "Tumblr".
 - **Repeat reblogs** of a post you already saw fold away.
+- **Less like this.** Tap ••• on any post (or press H). It folds with an Undo, and that topic cools off.
+- **Keys** on the dashboard: O shows a folded post, H is less like this, G switches For you and Following, Alt+Shift+D opens Dashwell. Tumblr's own L and R keys now teach Dashwell too.
+- **In the app:** pull down at the top of the feed to refresh, and bigger tap targets.
 
 ## Install
 
@@ -30,7 +33,7 @@ Your Tumblr dashboard, done well. A browser extension and an Android app that fi
 
 ## How the feed works
 
-`extension/feed.js` is the engine, plain JavaScript with no DOM, shared by the extension and the app. It is built from published recommender research: calibrated recommendations (Steck 2018) with a Dirichlet prior so one like can't take over, session satiation (Kapoor et al. 2015), tag grouping by co-occurrence (NPMI), xQuAD-style multi-topic rescue, tie strength normalized by posting rate (Gilbert & Karahalios 2009), and a 1-in-10 discovery slot. `npm test` runs its scenarios.
+`extension/feed.js` is the engine, plain JavaScript with no DOM, shared by the extension and the app. It is built from published recommender research: calibrated recommendations (Steck 2018) with a Dirichlet prior so one like can't take over, session satiation (Kapoor et al. 2015), tag grouping by co-occurrence (NPMI), xQuAD-style multi-topic rescue, tie strength normalized by posting rate (Gilbert & Karahalios 2009), a 1-in-10 discovery slot, dwell time as a weak signal (Yi et al. 2014), and explicit "less like this". A thumb fling past many posts isn't counted as skipping them. `npm test` runs its scenarios.
 
 ## Develop
 
