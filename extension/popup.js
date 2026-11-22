@@ -30,7 +30,16 @@ async function draw() {
           const li = el('li', '');
           const a = el('a', '', { href: p.link, className: 'post' });
           a.append(el('strong', p.title), el('small', `@${p.blog} · ${ago(p.time)}`));
-          a.onclick = (e) => (e.preventDefault(), open(p.link));
+          a.onclick = async (e) => {
+            e.preventDefault();
+            // opening one post marks just that one read
+            const { unread, lastSeen } = await chrome.storage.local.get({ unread: [], lastSeen: {} });
+            lastSeen[p.blog] = Math.max(lastSeen[p.blog] ?? 0, p.time);
+            const left = unread.filter((x) => x.link !== p.link);
+            await chrome.storage.local.set({ unread: left, lastSeen });
+            await chrome.action.setBadgeText({ text: left.length ? String(left.length) : '' });
+            open(p.link);
+          };
           li.append(a);
           return li;
         })
@@ -85,11 +94,8 @@ $('pin').onsubmit = async (e) => {
   chrome.runtime.sendMessage('check');
 };
 chrome.storage.local.get({ mutes: '' }).then(({ mutes }) => ($('mutes').value = mutes));
-let muteTimer;
-$('mutes').oninput = () => {
-  clearTimeout(muteTimer);
-  muteTimer = setTimeout(() => chrome.storage.local.set({ mutes: $('mutes').value }), 400);
-};
+// saved on every keystroke: a debounce lost the last edit when the popup closed right after typing
+$('mutes').oninput = () => chrome.storage.local.set({ mutes: $('mutes').value });
 
 $('blog').oninput = () => $('blog').setCustomValidity('');
 
@@ -133,6 +139,10 @@ async function checkUpdate() {
     $('update').hidden = false;
   } catch {} // offline: try again next time the sheet opens
 }
+
+$('tips').textContent = IS_APP
+  ? 'Tips: pull down at the top of the feed to refresh. Tap ••• on a post, then Less like this.'
+  : 'Keys on the dashboard: O shows a folded post, H means less like this, G switches For you and Following. Alt+Shift+D opens this.';
 
 $('credit').onclick = (e) => (e.preventDefault(), open('https://a3ro.dev'));
 
