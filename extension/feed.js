@@ -1,6 +1,7 @@
 // CaliStream-3S feed engine: pure JS, no DOM or browser APIs, so it ports to a mobile app.
 // Calibrated slots with Dirichlet shrinkage, session satiation, NPMI tag clustering,
-// frequency-normalized mutual tie strength, author spacing, reblog dedup, 1-in-10 exploration.
+// frequency-normalized mutual tie strength, author spacing, reblog dedup, 1-in-10 exploration,
+// implicit dwell (Yi et al. 2014) and explicit "less like this" feedback.
 (() => {
   const DAY = 864e5;
   const MIN = 6e4;
@@ -25,7 +26,7 @@
     MAX_TAG_STATS: 1500,
     MAX_PAIRS: 8000,
   };
-  const WEIGHTS = { like: 1, reblog: 2.2, comment: 2.5, expand: 1.2 };
+  const WEIGHTS = { like: 1, reblog: 2.2, comment: 2.5, expand: 1.2, dwell: 0.4 };
   const META = new Set(['reblog', 'reblogs', 'mine', 'queued', 'queue', 'long post', 'fy', 'fyp', 'personal', 'text', 'photo', 'video', 'tumblr', 'repost']);
   // matched against `tag + ' '`, so "sob" catches "#sob" but not "#sobriety"
   const COMMENTARY = /^(i|im|i'm|my|me|you|we|he|she|they|his|her|their|our|its|it's|this|that|so|just|not|no|yes|oh|ok|okay|why|what|how|wait|omg|lol|literally|screaming|crying|sob|help|op|bro|guys|also|anyway|update|real|mood|same) /;
@@ -52,7 +53,7 @@
   }
 
   const emptyProfile = () => ({ n: 0, boost: {}, tags: {}, pairs: {}, map: {}, blogs: {}, debt: {}, imp: {} });
-  const newSession = () => ({ window: [], shown: 0, roots: new Set(), engaged: {} });
+  const newSession = () => ({ window: [], shown: 0, lastExplore: 0, roots: new Set(), engaged: {} });
 
   const tagWeight = (s, now) => (s ? (s.f ?? 0) * half(now - s.t, P.FAST_HL_DAYS * DAY) + (s.s ?? 0) * half(now - s.t, P.SLOW_HL_DAYS * DAY) : 0);
   const clusterOf = (p, tag) => p.map[tag] ?? tag;
@@ -194,12 +195,16 @@
 
   function recordInteraction(p, session, post, kind, now) {
     const tags = cleanTags(post.tags);
-    if (kind === 'skip') {
-      for (const t of tags) addDebt(p, clusterOf(p, t), 0.65, now);
+    // negatives count once per topic, not once per tag: a 6-tag post is one skip, not six
+    if (kind === 'skip' || kind === 'hide') {
+      for (const cid of new Set(tags.map((t) => clusterOf(p, t)))) addDebt(p, cid, kind === 'hide' ? 2 : 0.65, now);
+      // "less like this" also fades the recent interest, so it outlasts the session
+      if (kind === 'hide') for (const t of tags) if (p.tags[t]) p.tags[t].f *= 0.5;
       return;
     }
     const w = WEIGHTS[kind] ?? 1;
-    if (post.blog) {
+    const weak = kind === 'dwell'; // reading is a hint about the topic, not about the blog or a new obsession
+    if (post.blog && !weak) {
       const b = (p.blogs[post.blog] ??= { w: 0, t: now, seen: 1, eng: 0, first: now });
       b.w = b.w * half(now - b.t, P.BLOG_HL_DAYS * DAY) + w;
       b.t = now;
@@ -210,7 +215,7 @@
     for (const t of tags) {
       const cid = clusterOf(p, t);
       const set = (session.engaged[cid] ??= new Set());
-      set.add(post.root ?? post.id);
+      if (!weak) set.add(post.root ?? post.id);
       // sustained intent: 3+ distinct posts in one topic this session is a real shift, follow it
       const sustained = set.size >= 3;
       const s = (p.tags[t] ??= { n: 1, a: [], e: 0, f: 0, s: 0, t: now });
@@ -271,7 +276,9 @@
       return shown({ action: 'show', reason: `shown: ${label(open)}${via ? ` (via #${via})` : ''} · slot ${used(open) + 1}/${quota(open)} of recent ${P.W}` }, clusters, true);
     }
     const novel = clusters.find((c) => (p.imp[c] ?? 0) < P.NOVEL_IMPRESSIONS);
-    if (novel && session.shown % P.EXPLORE_EVERY === P.EXPLORE_EVERY - 1) {
+    // the discovery slot opens every EXPLORE_EVERY shown posts and waits for a novel post to use it
+    if (novel && session.shown - session.lastExplore >= P.EXPLORE_EVERY - 1) {
+      session.lastExplore = session.shown + 1;
       return shown({ action: 'explore', reason: `fresh pick: exploring ${label(novel)} (1-in-${P.EXPLORE_EVERY} discovery slot)` }, clusters, true);
     }
     const crowded = clusters.reduce((a, b) => (used(b) / quota(b) > used(a) / quota(a) ? b : a));

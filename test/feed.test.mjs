@@ -180,3 +180,45 @@ test('12. mute list: blogs anywhere in the trail, exact tags, whole phrases', ()
 test('13. sentence-like tags ("#his baby!") never become topics', () => {
   assert.deepEqual(T.cleanTags(['#his baby!', '#so true', '#oh no', '#marvel']), ['marvel']);
 });
+
+test('14. the discovery slot waits for a novel post instead of needing an exact count', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  s.shown = 13; // past the 10th post, no novel post came along yet
+  run(p, s, [post(['new thing']), post(['new thing'])]);
+  const [d, again] = run(p, s, [post(['new thing']), post(['new thing'])]);
+  assert.equal(d.action, 'explore');
+  assert.equal(again.action, 'collapse', 'one discovery slot, not one per post');
+});
+
+test('15. a skip counts once per topic, however many tags the post has', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  p.map = { 'black hole': 'space', nebula: 'space', astronomy: 'space' };
+  T.recordInteraction(p, s, post(['space', 'black holes', 'nebula', 'astronomy']), 'skip', now);
+  const one = T.emptyProfile();
+  T.recordInteraction(one, s, post(['space']), 'skip', now);
+  assert.equal(p.debt.space.d, one.debt.space.d);
+});
+
+test('16. "less like this" cools a topic harder than a skip and fades its recent interest', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  for (let i = 0; i < 5; i++) T.recordInteraction(p, s, post(['anime']), 'like', now - DAY);
+  const f = p.tags.anime.f;
+  T.recordInteraction(p, s, post(['anime']), 'hide', now);
+  assert.ok(p.debt.anime.d > 0.65 && p.tags.anime.f < f);
+});
+
+test('17. reading posts (dwell) never makes a blog a favorite on its own', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  for (let i = 0; i < 20; i++) {
+    const x = post(['art'], 'reader');
+    T.observe(p, x, now);
+    T.recordInteraction(p, s, x, 'dwell', now);
+  }
+  assert.deepEqual(T.favorites(p, [], now), []);
+  assert.ok(T.topInterests(p, now)[0].tag === 'art');
+  assert.ok(!(p.boost.art > now), 'reading is not a new obsession');
+});
