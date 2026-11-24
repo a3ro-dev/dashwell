@@ -343,7 +343,11 @@ test('23. the stored profile stays bounded for a heavy long-tail user', () => {
     const x = { id: `q${i}`, blog: `blog${tail(3000)}`, tags: Array.from({ length: 1 + Math.floor(rnd() * 6) }, () => `tag ${tail(4000)}`), text: 'x', trail: rnd() < 0.3 ? [`blog${tail(3000)}`] : [], root: String(1700000000000000000n + BigInt(tail(100000)) * 123457n) };
     T.observe(p, x, at);
     const d = T.decide(p, s, x, [], at);
-    if (d.action !== 'collapse' || rnd() < 0.2) T.learnImpression(p, s, x, { engaged: rnd() < 0.1, dwell: rnd() < 0.2, skip: rnd() < 0.3 }, at);
+    T.audit(p, '8899aabbccdd-' + i, 4 | (d.action === 'collapse' ? 2 : 128), true);
+    if (d.action !== 'collapse' || rnd() < 0.2) {
+      T.remember(p, x.root);
+      T.learnImpression(p, s, x, { engaged: rnd() < 0.1, dwell: rnd() < 0.2, skip: rnd() < 0.3 }, at);
+    }
     if (rnd() < 0.05) T.recordInteraction(p, s, x, 'like', at);
   }
   const kb = JSON.stringify(p).length / 1024;
@@ -436,4 +440,17 @@ test('repeated shop links on coherent tag sets do not trigger spam folds', () =>
       assert.doesNotMatch(d.reason, /tag-stuffed/);
     }
   }
+});
+
+test('local comparison uses exposed content and keeps outcomes by disagreement direction', () => {
+  const p = T.emptyProfile();
+  const e = T.event;
+  T.audit(p, 'opened', e.fold, true);
+  T.audit(p, 'opened', e.visible | e.fold);
+  T.audit(p, 'opened', e.open | e.read | e.like);
+  T.audit(p, 'hid', e.shadow, true);
+  T.audit(p, 'hid', e.visible | e.shadow | e.read | e.hide);
+  T.audit(p, 'preloaded', e.fold, true);
+  assert.match(T.deviceStats(p), /Only Dashwell folded: 1\/1 .*? folds opened, 1\/1/);
+  assert.match(T.deviceStats(p), /Only the older rules would fold: 0\/0 folds opened, 0\/1 .*?, 1\/1/);
 });

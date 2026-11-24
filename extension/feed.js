@@ -687,8 +687,8 @@
     const row = rows.findLast(x => x[0] === key);
     if (row) {
       // Snapshot the actual render on first exposure, after any preload-time settings changes.
-      if ((flags & 4) && !(row[1] & 4)) row[1] = (row[1] & ~2) | (flags & 2);
-      row[1] |= flags & ~2;
+      if ((flags & 4) && !(row[1] & 4)) row[1] = (row[1] & ~3) | (flags & 3);
+      row[1] |= flags & ~3;
     }
     else if (create) {
       rows.push([key, flags]);
@@ -704,7 +704,7 @@
       const rate = (n, d) => d ? n + '/' + d + ' (' + Math.round(100 * n / d) + '%)' : '0/0';
       return rate(folds.filter(x => x & event.open).length, folds.length) + ' folds opened, ' +
         rate(count(event.like) + count(event.reblog), shown.length) + ' Like/Reblog presses per shown post, ' +
-        rate(count(event.hide), shown.length) + ' hides per shown post, ' + count(event.dwell) + ' reads of 4-60s and ' + count(event.skip) + ' quick skips';
+        rate(count(event.hide), shown.length) + ' hides per shown post, ' + count(event.dwell) + ' reads of 4s or longer and ' + count(event.skip) + ' quick skips';
     };
     return 'Recent visible For you posts: ' + counts(rows) +
       '. Only Dashwell folded: ' + counts(rows.filter(x => (x & 3) === 2)) +

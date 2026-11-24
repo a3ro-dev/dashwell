@@ -5,7 +5,7 @@ const ARTICLE = '[data-id] article';
 const SPONSORED = ':is([data-cell-id], [data-id]):is(:has(.iab_sf), :has(a[href*="/relevantads"])), aside div:has(> div > div > [id^="aditude"])';
 const DEFAULTS = { hidePremium: true, shapeFeed: true, hideSuggestions: true, followingFirst: false };
 const FAST_SKIP_MS = 300;
-const DWELL_MS = [4000, 60000]; // read for 4 s+; past a minute the phone was probably put down
+const DWELL_MS = 4000; // one weak signal for accumulated foreground reading time
 
 const session = T.newSession();
 const decisions = new Map(); // tab + post id -> decision; Tumblr's list re-mounts posts on scroll
@@ -15,6 +15,7 @@ const engaged = new Set(); // ids the user liked, reblogged, commented on or exp
 const labeled = new Set(); // ids that already got their one impression label
 const ads = new Set();
 let engine = T.emptyProfile();
+let ready = false;
 let pinned = [];
 let settings = DEFAULTS;
 let mutes = [];
@@ -91,7 +92,6 @@ async function flush() {
   }
 }
 setInterval(flush, 5000);
-document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 
 function learn(post, kind) {
   const k = `${post.id}:${kind}`;
@@ -169,6 +169,7 @@ function queueSkip(post) {
   }, 700);
 }
 const inView = new Set();
+let foregroundStart = performance.now();
 const elapsed = new Map();
 const exposed = new Set();
 const pendingHides = new Set();
@@ -178,7 +179,10 @@ function visibleAudit(article) {
   const id = article.closest('[data-id]')?.dataset.id;
   if (!audits.has(id) || onFollowing() || audited.has(id)) return;
   audited.add(id);
-  outcome(id, 4 | (article.classList.contains('tn-collapsed') ? 2 : 0));
+  const base = decisions.get(keyOf(id));
+  const shadowFolded = settings.shapeFeed && (base?.older || base?.mute);
+  outcome(id, T.event.visible | (shadowFolded ? T.event.shadow : 0) |
+    (article.classList.contains('tn-collapsed') ? T.event.fold : 0));
 }
 function expose(post) {
   if (exposed.has(post.id)) return;
@@ -190,7 +194,7 @@ function resume(article, time) {
   const post = posts.get(article.closest('[data-id]')?.dataset.id);
   if (!post) return;
   outcome(post.id, T.event.read);
-  visibleSince.set(article, { time, post });
+  visibleSince.set(article, { time: Math.max(time, foregroundStart), post });
   expose(post);
 }
 function pause(article, time, left) {
@@ -200,11 +204,11 @@ function pause(article, time, left) {
   const { post } = active;
   const ms = (elapsed.get(post.id) ?? 0) + Math.max(0, time - active.time);
   elapsed.set(post.id, ms);
+  const dwell = ms >= DWELL_MS;
+  if (dwell) learn(post, 'dwell');
   if (!left || ms <= 0) return;
   if (ms < FAST_SKIP_MS && !engaged.has(post.id)) queueSkip(post);
   else {
-    const dwell = ms >= DWELL_MS[0] && ms <= DWELL_MS[1];
-    if (dwell) learn(post, 'dwell');
     impress(post.id, { dwell });
   }
 }
@@ -222,10 +226,12 @@ const skipWatcher = new IntersectionObserver(entries => {
 }, { threshold: [0, 0.001] });
 document.addEventListener('visibilitychange', () => {
   const time = performance.now();
+  if (!document.hidden) foregroundStart = time;
   for (const article of inView) {
     if (document.hidden) pause(article, time, false);
     else { visibleAudit(article); resume(article, time); }
   }
+  if (document.hidden) flush();
 });
 
 // "Less like this": fold the post now with an undo and cool its topics. From the H key or Tumblr's ••• menu.
@@ -370,6 +376,7 @@ function retitle() {
 }
 
 function scan() {
+  if (!ready) return;
   retitle();
   for (const article of inView) {
     if (article.isConnected !== false) continue;
@@ -389,11 +396,12 @@ function scan() {
         if (!posts.has(post.id)) mutate(p => T.observe(p, post, now));
         const older = !onFollowing() && T.shadowFold(engine, shadow, post, pinned, now);
         const decision = decideHere(post, now);
+        decision.older = older;
         decisions.set(key, decision);
         if (!onFollowing()) {
           const auditKey = tabKey + '-' + audits.size;
           audits.set(post.id, auditKey);
-          const flags = Number(older) | (settings.shapeFeed && (T.mutedBy(mutes, post) || decision.action === 'collapse') ? 2 : 0);
+          const flags = Number(!!(settings.shapeFeed && (older || T.mutedBy(mutes, post)))) | (settings.shapeFeed && (T.mutedBy(mutes, post) || decision.action === 'collapse') ? 2 : 0);
           mutate(p => T.audit(p, auditKey, flags, true));
         }
         posts.set(post.id, post);
@@ -564,7 +572,7 @@ chrome.storage.onChanged.addListener((changes) => {
         profile.rr = profile.rr.filter(root => root !== (posts.get(id).root ?? id));
         const state = previous.before;
         const revised = T.decide(profile, { ...state, window: state.window.slice() }, posts.get(id), pinned, Date.now());
-        decisions.set(keyOf(id), { ...revised, before: state });
+        decisions.set(keyOf(id), { ...revised, before: state, older: previous.older });
       }
       article.querySelector('.tn-bar')?.remove();
       article.classList.remove('tn-collapsed');
@@ -588,6 +596,7 @@ chrome.storage.local.get({ engine: null, pinned, settings, unread: [], mutes: ''
   unreadCount = s.unread.length;
   pinned = s.pinned;
   settings = { ...DEFAULTS, ...s.settings };
+  ready = true;
   followingFirst();
   applySettings();
   scan();

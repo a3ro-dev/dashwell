@@ -73,6 +73,9 @@ test('mounted posts reconcile without observing again, preloads and body links s
   assert.ok(t.article.querySelector('.tn-bar'));
   t.change({ mutes: { newValue: '' } });
   assert.equal(t.article.querySelector('.tn-bar'), undefined);
+  t.change({ mutes: { newValue: 'long' } });
+  t.change({ settings: { newValue: { shapeFeed: false } } });
+  assert.equal(t.article.querySelector('.tn-bar'), undefined);
   assert.equal(t.run('engine.n'), 1);
   t.visible(10, true);
   assert.equal(t.run('engine.rr.join()'), '1234567');
@@ -109,7 +112,7 @@ test('actual first exposure supplies denominators and separates disagreement out
   t.visible(100, true);
   t.article.querySelector('.tn-bar button').onclick();
   t.run("learn(posts.get('1234567'), 'like')");
-  assert.match(t.run('T.deviceStats(engine)'), /Only Dashwell folded: 1\/1 \(100%\) folds opened, 1\/1/);
+  assert.match(t.run('T.deviceStats(engine)'), /Recent visible For you posts: 1\/1 \(100%\) folds opened, 1\/1/);
 });
 
 test('repeated intersections preserve a read and a brief foreground pass can count as a skip', async () => {
@@ -125,4 +128,14 @@ test('repeated intersections preserve a read and a brief foreground pass can cou
   skip.visible(230, false);
   skip.drainTimers();
   assert.equal(skip.run("learned.has('1234567:skip')"), true);
+});
+
+test('extract roots from the oldest linked trail entry and ignore links inside ordinary post text', async () => {
+  const t = await tab(storage());
+  const a = t.article;
+  const links = hrefs => hrefs.map(href => ({ getAttribute: () => href }));
+  a.querySelectorAll = selector => selector.includes('reblog-header')
+    ? links(['/original/1111111', '/middle/2222222'])
+    : selector === 'a[href]' ? links(['/citation/9999999']) : [];
+  assert.equal(t.run('readPost(document.querySelectorAll(ARTICLE)[0]).root'), '1111111');
 });
