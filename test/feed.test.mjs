@@ -376,3 +376,19 @@ test('25. "less like this" outlasts the session: the topic gets no slots for wee
   assert.equal(pin.action, 'favorite');
   assert.ok(T.quotaFn(p, now + 90 * DAY)('anime') > 0, 'and it fades');
 });
+
+test('26. a value-folded topic gets a rare second chance, but not one you asked for less of', () => {
+  const p = T.emptyProfile();
+  const react = (x) => (x.tags.includes('hazbin hotel') ? { skip: true } : x.tags.includes('jazz') ? { engaged: true, dwell: true } : {});
+  const mix = (k) => Array.from({ length: 30 }, (_, i) => post([['hazbin hotel', 'jazz', `filler ${i % 9}`][i % 3]], `b${(i * 7 + k) % 23}`));
+  for (let day = 0; day < 20; day++) session(p, mix(day), react, now + day * DAY);
+  const long = [21, 22, 23, 24, 25].flatMap(mix);
+  const hazbin = session(p, long, react, now + 21 * DAY).filter((_, i) => i % 3 === 0);
+  const chances = hazbin.filter((d) => d.reason.startsWith('second chance'));
+  assert.ok(chances.length >= 1 && chances.length <= 3, `second chances ${chances.length}/${hazbin.length}`);
+  assert.ok(folded(hazbin).length >= hazbin.length * 0.8, `still mostly folded: ${folded(hazbin).length}/${hazbin.length}`);
+  // after "less like this", no second chances for it
+  for (let i = 0; i < 3; i++) T.recordInteraction(p, T.newSession(), post(['hazbin hotel']), 'hide', now + 26 * DAY);
+  const after = session(p, [26, 27, 28, 29, 30].flatMap(mix), react, now + 26 * DAY).filter((_, i) => i % 3 === 0);
+  assert.equal(after.filter((d) => d.reason.startsWith('second chance')).length, 0);
+});

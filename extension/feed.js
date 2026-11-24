@@ -26,6 +26,7 @@
     BURST_WINDOW: 8,
     AUTHOR_CAP: 2, // posts per non-mutual author per window
     EXPLORE_EVERY: 10,
+    CHANCE_EVERY: 40, // a value fold can't learn it was wrong, so one in this many shown posts lets one through
     NOVEL_IMPRESSIONS: 15,
     MAX_TAGS: 12, // authors put real topic tags first
     TOP_CLUSTERS: 3,
@@ -561,7 +562,16 @@
     const warm = m.k >= P.WARM && !m.q;
     const fold = m.k >= P.WARM + P.VALUE_AFTER && !m.q; // value folds wait until the model has seen a while
     const vt = vText(sc.v);
-    const foldByValue = () => ({ action: 'collapse', reason: `folded: you usually pass on ${worstFeature(m, fv, sc)}${vt}`, say: 'You usually scroll past posts like this', clusters: [] });
+    // Folded posts get no labels, so a topic folded during a bad patch would stay folded. Now and then
+    // let one through as a second chance; what you do with it teaches the model either way.
+    const foldByValue = (why = worstFeature(m, fv, sc)) => {
+      // not for topics you asked for less of: that was an instruction, not a bad patch
+      if (session.shown - (session.lastChance ?? 0) >= P.CHANCE_EVERY && !clusters.some((c) => hidOf(p, c, now) > 0.2)) {
+        session.lastChance = session.shown + 1;
+        return shown({ action: 'explore', reason: `second chance: you usually pass on ${why}, trying one again${vt}` }, clusters, true);
+      }
+      return { action: 'collapse', reason: `folded: you usually pass on ${why}${vt}`, say: 'You usually scroll past posts like this', clusters: [] };
+    };
 
     // a topic whose typical post is already below the fold line is one you usually pass on
     const usual = clusters.length && clusters.every((c) => m.cv[c]?.[1] >= P.CV_MIN && m.cv[c][0] < m.th) ? clusters[0] : null;
@@ -583,7 +593,7 @@
     // xQuAD-style rescue: collapse only if ALL of the post's topics are full. Before the model knows
     // you, only the strongest topic of a multi-topic post can open a slot, so one open topic can't carry a spam post.
     const open = (warm ? clusters : clusters.slice(0, 1)).find((c) => used(c) < quota(c));
-    if (fold && usual && sc.v < m.hi) return { ...foldByValue(), reason: `folded: you usually pass on ${label(usual)}${vt}` };
+    if (fold && usual && sc.v < m.hi) return foldByValue(label(usual));
     if (fold && sc.v < m.th) {
       const top = Object.keys(an.scores).sort((a, b) => an.scores[b] - an.scores[a]).slice(0, 3);
       if (!(open && top.includes(open))) return foldByValue();
