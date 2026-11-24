@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import '../extension/feed.js';
 
 const T = globalThis.TumblrNew;
@@ -221,4 +222,157 @@ test('17. reading posts (dwell) never makes a blog a favorite on its own', () =>
   assert.deepEqual(T.favorites(p, [], now), []);
   assert.ok(T.topInterests(p, now)[0].tag === 'art');
   assert.ok(!(p.boost.art > now), 'reading is not a new obsession');
+});
+
+// ---- v2: value model, impression labels, cross-session memory ----
+
+const nothing = () => 0; // Thompson noise off: the same value every time
+// One simulated session: decide each post, then label it the way content.js would. `react` maps a post to its label.
+function session(p, posts, react, t, pinned = []) {
+  const s = T.newSession();
+  s.rand = nothing;
+  return posts.map((x, i) => {
+    const at = t + i * 1e4;
+    T.observe(p, x, at);
+    const d = T.decide(p, s, x, pinned, at);
+    if (d.action !== 'collapse') T.learnImpression(p, s, x, react(x), at);
+    return d;
+  });
+}
+const folded = (ds) => ds.filter((d) => d.action === 'collapse');
+
+test('18. a topic you keep skipping is folded for good, in a later session, by value', () => {
+  const p = T.emptyProfile();
+  const react = (x) => (x.tags.includes('hazbin hotel') ? { skip: true } : x.tags.includes('jazz') ? { engaged: true, dwell: true } : {});
+  const mix = (k) => Array.from({ length: 30 }, (_, i) => post([['hazbin hotel', 'jazz', `filler ${i % 9}`][i % 3]], `b${(i * 7 + k) % 23}`));
+  for (let day = 0; day < 20; day++) session(p, mix(day), react, now + day * DAY);
+  assert.ok(p.m.k >= T.P.WARM + T.P.VALUE_AFTER, `warm after ${p.m.k} labels`);
+  const ds = session(p, mix(21), react, now + 21 * DAY);
+  const [hazbin, jazz] = [0, 1].map((o) => ds.filter((_, i) => i % 3 === o));
+  assert.ok(folded(hazbin).length >= 8, `hazbin folded ${folded(hazbin).length}/10`);
+  assert.ok(folded(hazbin).some((d) => /^folded: you usually pass on .*hazbin hotel/.test(d.reason)), folded(hazbin).map((d) => d.reason).join('\n'));
+  assert.ok(folded(jazz).length <= 2, `jazz folded ${folded(jazz).length}/10`);
+  assert.ok(folded(hazbin).every((d) => d.say && !d.reason.includes('\n')));
+});
+
+test('19. a strong match is shown past a full quota; a weak one is not', () => {
+  const p = T.emptyProfile();
+  const react = (x) => (x.tags.includes('jazz') ? { engaged: true, dwell: true } : { skip: true });
+  const train = (k) => Array.from({ length: 30 }, (_, i) => post(i % 3 === 0 ? ['jazz'] : [`other ${i % 7}`], `b${(i * 5 + k) % 29}`));
+  for (let day = 0; day < 6; day++) session(p, train(day), react, now + day * DAY);
+  const ds = session(p, Array.from({ length: 8 }, () => post(['jazz'])), react, now + 7 * DAY);
+  assert.ok(shownCount(ds) >= 6, ds.map((d) => d.reason).join('\n'));
+  assert.ok(ds.some((d) => d.action === 'show' && /^shown: strong match \(top \d+%\) though #jazz is full/.test(d.reason)), ds.map((d) => d.reason).join('\n'));
+  const weak = session(p, Array.from({ length: 8 }, () => post(['other 1'])), react, now + 7 * DAY + 1e6);
+  assert.ok(folded(weak).length >= 5, 'a topic you always skip gets no such rescue');
+});
+
+test('20. learnImpression: one label trains the heads it names, hide counts triple, a bare view is a mild no', () => {
+  const state = (out) => {
+    const p = T.emptyProfile();
+    const x = post(['art'], 'friend');
+    T.observe(p, x, now);
+    T.learnImpression(p, T.newSession(), x, out, now);
+    return { p, rec: p.m.f['a:friend'] };
+  };
+  const [zE, zD, zN] = [0, 2, 4];
+  const base = state({}).rec;
+  assert.ok(base[zE] > 0 && base[zD] > 0 && base[zN] > 0, 'seen and ignored: nothing positive');
+  assert.ok(state({ engaged: true }).rec[zE] < 0, 'engaged pulls the E head up');
+  assert.ok(state({ dwell: true }).rec[zD] < 0, 'dwell pulls the D head up');
+  const skip = state({ skip: true }).rec, hide = state({ hide: true }).rec;
+  assert.ok(skip[zN] < 0 && hide[zN] < skip[zN] * 2.5, `hide ${hide[zN]} vs skip ${skip[zN]}`);
+  assert.ok(Math.abs(state({ engaged: true, expanded: true }).rec[zE]) < Math.abs(state({ engaged: true }).rec[zE]), 'an expanded fold is a softer yes');
+  const { p } = state({ engaged: true });
+  assert.equal(p.m.k, 1);
+  assert.equal(p.blogs.friend.sh, 1, 'shown posts, not folded ones, count toward a blog');
+  const once = JSON.stringify(p.m.f);
+  T.decide(p, T.newSession(), post(['art'], 'friend'), [], now); // deciding alone never trains
+  assert.equal(JSON.stringify(p.m.f), once);
+});
+
+test('21. reblogs of posts you were shown are collapsed in later sessions too', () => {
+  const p = T.emptyProfile();
+  const [first] = session(p, [post(['x'], 'origin', { root: 'r9' })], () => ({}), now);
+  assert.equal(first.action, 'show');
+  const stored = JSON.parse(JSON.stringify(p)); // what chrome.storage hands back next time
+  const s2 = T.newSession();
+  s2.rand = nothing;
+  const again = post(['x'], 'random', { root: 'r9' });
+  T.observe(stored, again, now + DAY);
+  const d = T.decide(stored, s2, again, [], now + DAY);
+  assert.equal(d.action, 'collapse');
+  assert.match(d.reason, /already saw/);
+  const friend = post(['x'], 'bestie', { root: 'r9' });
+  T.observe(stored, friend, now + DAY);
+  assert.equal(T.decide(stored, s2, friend, ['bestie'], now + DAY).action, 'favorite');
+  for (let i = 0; i < T.P.MAX_ROOTS + 50; i++) T.decide(stored, s2, post(['y'], `o${i}`, { root: `root${i}` }), [], now + DAY);
+  assert.ok(stored.rr.length <= T.P.MAX_ROOTS, `${stored.rr.length} roots remembered`);
+});
+
+test('22. a real v1 profile from storage keeps working, and the model starts cold on it', () => {
+  const v1 = JSON.parse(readFileSync(new URL('./fixtures/v1-profile.json', import.meta.url), 'utf8'));
+  assert.ok(!('m' in v1) && !('rr' in v1) && v1.n > 400);
+  const when = 1793729993589.9956 + 3e5; // shortly after the last post in the fixture
+  assert.deepEqual(T.favorites(v1, [], when), ['mossyarchive', 'rusttea'], 'friends survive the upgrade');
+  assert.ok(T.topInterests(v1, when).length > 3);
+  const tags = Object.keys(v1.tags).length;
+  const ds = session(v1, Array.from({ length: 40 }, (_, i) => post([`t${i % 5}`, 'shared'], `b${i % 11}`)), (x) => ({ engaged: x.tags[0] === 't1' }), when);
+  assert.ok(v1.m && v1.rr && v1.m.k > 0 && v1.m.k < T.P.WARM, 'model created cold');
+  assert.ok(Object.keys(v1.tags).length >= tags, 'v1 statistics are kept');
+  for (const d of ds) assert.ok(d.reason && !d.reason.includes('\n') && !/undefined|NaN/.test(d.reason), d.reason);
+  const back = JSON.parse(JSON.stringify(v1));
+  assert.ok(T.decide(back, T.newSession(), post(['t1'], 'b1'), [], when + 1e6).action);
+  T.recordInteraction(back, T.newSession(), post(['t1'], 'b1'), 'hide', when + 1e6); // v1-era calls keep working
+  assert.ok(Object.values(back.hid).some((h) => h[0] > 0) && T.quotaFn(back, when + 1e6)('t1') >= 0);
+});
+
+test('23. the stored profile stays bounded for a heavy long-tail user', () => {
+  const p = T.emptyProfile();
+  let a = 1;
+  const rnd = () => ((a = (a * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const tail = (n) => Math.min(n - 1, Math.floor(n ** rnd() - 1));
+  let s = T.newSession();
+  s.rand = rnd;
+  for (let i = 0; i < 6000; i++) {
+    const at = now + (i / 200) * DAY;
+    if (i % 100 === 0) ((s = T.newSession()), (s.rand = rnd));
+    const x = { id: `q${i}`, blog: `blog${tail(3000)}`, tags: Array.from({ length: 1 + Math.floor(rnd() * 6) }, () => `tag ${tail(4000)}`), text: 'x', trail: rnd() < 0.3 ? [`blog${tail(3000)}`] : [], root: String(1700000000000000000n + BigInt(tail(100000)) * 123457n) };
+    T.observe(p, x, at);
+    const d = T.decide(p, s, x, [], at);
+    if (d.action !== 'collapse' || rnd() < 0.2) T.learnImpression(p, s, x, { engaged: rnd() < 0.1, dwell: rnd() < 0.2, skip: rnd() < 0.3 }, at);
+    if (rnd() < 0.05) T.recordInteraction(p, s, x, 'like', at);
+  }
+  const kb = JSON.stringify(p).length / 1024;
+  assert.ok(kb < 400, `${kb.toFixed(0)} KB`);
+  assert.ok(Object.keys(p.m.f).length <= T.P.MAX_FEATS + 20, `${Object.keys(p.m.f).length} features`);
+  assert.ok(p.rr.length <= T.P.MAX_ROOTS && Object.keys(p.blogs).length <= T.P.MAX_BLOGS + T.P.RECLUSTER_EVERY && Object.keys(p.pairs).length <= T.P.MAX_PAIRS + 2000);
+  assert.ok('b' in p.m.f, 'the bias is never evicted');
+});
+
+test('24. a post stuffed with tags that never go together is tag spam', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  for (let i = 0; i < 60; i++) run(p, s, [post(['space', 'nebula'], `b${i % 9}`), post(['cats', 'kitten'], `c${i % 9}`)]);
+  const [spam] = run(p, T.newSession(), [post(['marvel', 'baking', 'chess', 'tarot', 'follow for follow'], 'spammer')]);
+  assert.equal(spam.action, 'collapse');
+  assert.match(spam.reason, /tag-stuffed/);
+  const [ok] = run(p, T.newSession(), [post(['space', 'nebula'], 'honest')]);
+  assert.notEqual(ok.action, 'collapse');
+});
+
+test('25. "less like this" outlasts the session: the topic gets no slots for weeks, a pinned blog still passes', () => {
+  const p = T.emptyProfile();
+  const s = T.newSession();
+  for (let i = 0; i < 12; i++) T.observe(p, post(['anime'], `b${i}`), now);
+  T.recordInteraction(p, s, post(['anime']), 'hide', now);
+  T.recordInteraction(p, s, post(['anime']), 'hide', now);
+  const later = now + 7 * DAY;
+  assert.equal(T.quotaFn(p, later)('anime'), 0);
+  const [d] = run(p, T.newSession(), [post(['anime'], 'someone')], [], later);
+  assert.equal(d.action, 'collapse');
+  assert.match(d.reason, /you asked for less #anime/);
+  const [pin] = run(p, T.newSession(), [post(['anime'], 'bestie')], ['bestie'], later);
+  assert.equal(pin.action, 'favorite');
+  assert.ok(T.quotaFn(p, now + 90 * DAY)('anime') > 0, 'and it fades');
 });

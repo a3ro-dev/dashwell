@@ -11,6 +11,8 @@ const session = T.newSession();
 const decisions = new Map(); // tab + post id -> decision; Tumblr's list re-mounts posts on scroll
 const posts = new Map(); // post id -> parsed post
 const learned = new Set(); // post id + kind, so a like counts once even if click and key both fire
+const engaged = new Set(); // ids the user liked, reblogged, commented on or expanded
+const labeled = new Set(); // ids that already got their one impression label
 const ads = new Set();
 let engine = T.emptyProfile();
 let pinned = [];
@@ -62,7 +64,18 @@ function learn(post, kind) {
   const k = `${post.id}:${kind}`;
   if (learned.has(k)) return;
   learned.add(k);
+  if (['like', 'reblog', 'comment', 'expand'].includes(kind)) engaged.add(post.id);
   T.recordInteraction(engine, session, post, kind, Date.now());
+  save();
+}
+
+// One label per post the user actually saw (shown, or folded then expanded), the first time it
+// leaves the viewport or is hidden. Folded posts that were never expanded and thumb flings get none.
+function impress(id, out) {
+  if ((labeled.has(id) && !out.hide) || !posts.has(id)) return; // a later "less like this" still teaches
+  labeled.add(id);
+  const d = decisions.get(keyOf(id));
+  T.learnImpression?.(engine, session, posts.get(id), { engaged: engaged.has(id), expanded: !!d?.shown, ...out }, Date.now());
   save();
 }
 
@@ -96,7 +109,11 @@ function queueSkip(post) {
   skips.push(post);
   clearTimeout(skipTimer);
   skipTimer = setTimeout(() => {
-    if (skips.length < 4) for (const x of skips) learn(x, 'skip');
+    if (skips.length < 4)
+      for (const x of skips) {
+        learn(x, 'skip');
+        impress(x.id, { skip: true });
+      }
     skips = [];
   }, 700);
 }
@@ -109,9 +126,13 @@ const skipWatcher = new IntersectionObserver((entries) => {
       const ms = e.time - visibleSince.get(id);
       visibleSince.delete(id);
       const d = decisions.get(keyOf(id));
-      if (!d || d.action === 'collapse' || !posts.has(id)) continue;
-      if (ms < FAST_SKIP_MS) queueSkip(posts.get(id));
-      else if (ms >= DWELL_MS[0] && ms <= DWELL_MS[1] && !document.hidden) learn(posts.get(id), 'dwell');
+      if (!d || (d.action === 'collapse' && !d.shown) || !posts.has(id)) continue;
+      if (ms < FAST_SKIP_MS && !d.shown) queueSkip(posts.get(id));
+      else {
+        const dwell = ms >= DWELL_MS[0] && ms <= DWELL_MS[1] && !document.hidden;
+        if (dwell) learn(posts.get(id), 'dwell');
+        impress(id, { dwell });
+      }
     }
   }
 }, { threshold: 0.5 });
@@ -123,6 +144,7 @@ function hidePost(article, post) {
   decisions.set(keyOf(post.id), d);
   render(article, post, d);
   learn(post, 'hide');
+  impress(post.id, { hide: true });
   // a tall post folding above the fold would yank the feed up; keep the Undo line in view instead
   const top = article.getBoundingClientRect().top;
   if (top < 64) scrollBy(0, top - 64);
