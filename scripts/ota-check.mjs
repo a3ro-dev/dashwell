@@ -121,7 +121,7 @@ if (process.argv.includes('--live')) {
       if (document.documentElement) run();
       else new MutationObserver((_, o) => document.documentElement && (o.disconnect(), run())).observe(document, { childList: true });
     }`);
-    await page.goto('https://www.tumblr.com/dashboard', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(process.env.LIVE_URL ?? 'https://www.tumblr.com/dashboard/stuff_for_you', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await new Promise((r) => setTimeout(r, 6000));
     for (let i = 0; i < 6; i++) await page.mouse.wheel({ deltaY: 1400 }), await new Promise((r) => setTimeout(r, 1500));
     await new Promise((r) => setTimeout(r, 6000)); // engine saves every 5 s
@@ -136,11 +136,12 @@ if (process.argv.includes('--live')) {
         engineKeys: e && Object.keys(e),
       };
     });
-    await page.close();
+    if (!process.env.KEEP) await page.close();
     b.disconnect();
     console.log(JSON.stringify(r, null, 1));
     if (!r.loggedIn) fail('debug browser is not logged in to Tumblr');
     if (errors.length) fail(`page exceptions: ${errors.join(' | ')}`);
+    if (r.path.includes('following')) fail(`landed on ${r.path}, not For you: the engine was not exercised`);
     (r.decided > 0 ? ok : fail)(`live For you: ${r.decided} posts decided by the OTA bundle on top of the old profile`);
   }
 }
