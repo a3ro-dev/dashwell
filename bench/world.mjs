@@ -78,7 +78,7 @@ export function makeWorld(seed) {
 function tagsFor(world, r, topic, isReblog, spam) {
   const tags = [];
   if (spam) {
-    tags.push(...r.sample(world.topics, 4 + r.int(3)).map((t) => t.hub), 'follow for follow');
+    tags.push(...r.sample(world.topics, 2 + r.int(4)).map((t) => r.chance(0.6) ? t.hub : r.pick(t.co)));
   } else if (!r.chance(0.1)) { // a tenth of posts carry no topic tags at all
     if (r.chance(isReblog ? 0.5 : 0.75)) tags.push(topic.hub);
     tags.push(...r.sample(topic.co, 1 + r.int(3)));
@@ -112,8 +112,11 @@ export function makeFeed(world, follows, r) {
       const rootId = root?.id ?? id;
       const dup = seenRoots.has(rootId);
       seenRoots.add(rootId);
-      const tags = tagsFor(world, r, topic, !!root, spam);
-      return { topic: topic.id, kind: blog.kind, dup, view: { id, blog: blog.name, root: rootId, trail: root ? [root.blog] : [], tags, text: tags.join(' ') } };
+      let tags = tagsFor(world, r, topic, !!root, spam);
+      const body = spam ? 'New prints available this week at my shop' : 'I keep thinking about ' + r.pick(topic.co);
+      const destination = spam ? 'https://' + blog.name + '.example/shop' : '';
+      if (r.chance(0.18)) tags = tags.slice(0, 1);
+      return { topic: topic.id, kind: blog.kind, dup, view: { id, blog: blog.name, root: rootId, trail: root ? [root.blog] : [], tags, body, destination, text: body } };
     },
   };
 }

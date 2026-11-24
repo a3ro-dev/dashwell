@@ -78,6 +78,6 @@ export function react(user, post, x) {
     dwell: read && x[2] < 0.7 * u,
     like: read && x[3] < 0.6 * u ** 1.5,
     reblog: read && x[4] < 0.3 * u ** 2.5,
-    expand: x[5] < 0.03 + 0.6 * u ** 2, // would press Show on a folded post
+    expand: x[5] < 0.03 + 0.015 * (user.idx % 3), // would press Show on a folded post
   };
 }

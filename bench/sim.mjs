@@ -42,7 +42,7 @@ export function buildTrace(world, user) {
       post.q = 0.07 * r.normal();
       post.u = utility(user, post, s);
       post.act = react(user, post, [r(), r(), r(), r(), r(), r()]);
-      trace.push({ s, now, post });
+      trace.push({ s, now, post, viewed: r() >= 0.12 });
     }
   });
   return trace;
@@ -51,13 +51,14 @@ export function buildTrace(world, user) {
 // Drive the engine the way content.js does. Returns which posts it folded plus cost numbers.
 // An engine that exports learnImpression also gets one label per post the user saw (shown, or folded
 // then expanded), exactly as content.js sends it; flings are not modelled, so nothing is left unlabeled.
-export function runEngine(T, trace, label = '') {
-  const engine = T.emptyProfile();
+export function runEngine(T, trace, label = '', engine = T.emptyProfile()) {
+  const delayed = [];
   const rand = makeRng(`${seed}:engine:${label}`);
   let session, lastS = -1, ms = 0;
   const times = [];
   const decisions = [];
-  const folded = trace.map(({ s, now, post }) => {
+  const folded = trace.map(({ s, now, post, viewed }, idx) => {
+    while (delayed.length && delayed[0].at <= idx) delayed.shift().apply();
     if (s !== lastS) ((session = T.newSession()), (session.rand = rand), (lastS = s));
     const t0 = performance.now();
     T.observe(engine, post.view, now);
@@ -69,12 +70,18 @@ export function runEngine(T, trace, label = '') {
     decisions.push(d);
     const a = post.act;
     const read = [a.dwell && 'dwell', a.like && 'like', a.reblog && 'reblog'].filter(Boolean);
-    const kinds = fold ? (a.expand ? ['expand', ...read] : []) : a.hide ? ['hide'] : a.skip ? ['skip'] : read;
-    for (const k of kinds) T.recordInteraction(engine, session, post.view, k, now);
-    if (T.learnImpression && (!fold || a.expand))
-      T.learnImpression(engine, session, post.view, { engaged: !!(fold || a.like || a.reblog), expanded: fold, dwell: !!a.dwell && !a.hide && !a.skip, skip: !fold && !!a.skip, hide: !fold && !!a.hide }, now);
+    if (viewed && (!fold || a.expand)) {
+      T.remember?.(engine, post.view.root);
+      const current = session;
+      const kinds = [...(fold ? ['expand'] : []), ...(a.hide ? ['hide'] : a.skip ? ['skip'] : read)];
+      delayed.push({ at: idx + 3, apply() {
+        for (const k of kinds) T.recordInteraction(engine, current, post.view, k, now);
+        T.learnImpression?.(engine, current, post.view, { engaged: !!((fold && !T.remember) || a.like || a.reblog), expanded: fold, dwell: a.dwell, skip: a.skip, hide: a.hide }, now);
+      } });
+    }
     return fold;
   });
+  for (const entry of delayed) entry.apply();
   times.sort((x, y) => x - y);
   return { folded, decisions, us: (ms * 1000) / trace.length, p95us: times[Math.floor(0.95 * (times.length - 1))] * 1000, kb: JSON.stringify(engine).length / 1024 };
 }
@@ -92,6 +99,8 @@ function runOracle(trace, rate) {
 }
 
 function evaluate(trace, folded, user) {
+  folded = folded.filter((_, i) => trace[i].viewed);
+  trace = trace.filter(t => t.viewed);
   const posts = trace.map((t) => t.post);
   const us = posts.map((p) => p.u);
   const med = quantile(us, 0.5), q75 = quantile(us, 0.75);
@@ -121,6 +130,8 @@ function evaluate(trace, folded, user) {
 
   const m = {
     lift: mean(shown.map((p) => p.u)) / mean(us),
+    first20: mean(posts.slice(0,20).filter(p => shownSet.has(p)).map(p => p.u)),
+    consecutive: mean(folded.map((f,i) => Number(f && folded[i-1] && trace[i].s === trace[i-1].s))),
     prec: share(shown, (p) => p.u > med),
     recall: share(posts.filter((p) => p.u >= q75), (p) => shownSet.has(p)),
     fold: foldedPosts.length / posts.length,
@@ -167,6 +178,7 @@ async function main() {
   await import(pathToFileURL(enginePath).href);
   const T = globalThis.TumblrNew;
   if (!T?.decide) throw new Error(`${enginePath} did not set globalThis.TumblrNew`);
+  const legacy = (await import('./feed.v1.js'), globalThis.TumblrNew);
   const world = makeWorld(seed);
   const runs = Object.fromEntries(['baseline', 'engine', 'oracle'].map((p) => [p, Object.fromEntries(PERSONAS.map((x) => [x, []]))]));
   for (const persona of PERSONAS)
@@ -176,7 +188,11 @@ async function main() {
       const eng = runEngine(T, trace, `${persona}:${idx}`);
       const rate = eng.folded.filter(Boolean).length / trace.length;
       runs.baseline[persona].push(evaluate(trace, trace.map(() => false), user));
-      runs.engine[persona].push({ ...evaluate(trace, eng.folded, user), us: eng.us, p95: eng.p95us, kb: eng.kb });
+      const profile = legacy.emptyProfile();
+      runEngine(legacy, trace.filter(t => t.s < 3), 'migration', profile);
+      const next = trace.filter(t => t.s === 3);
+      const migrated = runEngine(T, next, 'migration', JSON.parse(JSON.stringify(profile)));
+      runs.engine[persona].push({ migrated20: evaluate(next, migrated.folded, user).first20, ...evaluate(trace, eng.folded, user), us: eng.us, p95: eng.p95us, kb: eng.kb });
       runs.oracle[persona].push(evaluate(trace, runOracle(trace, rate), user));
     }
   const results = {};

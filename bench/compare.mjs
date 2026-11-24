@@ -6,8 +6,8 @@ import { dirname, join } from 'node:path';
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const i = process.argv.indexOf('--seeds');
-const seeds = (i > 0 ? process.argv[i + 1] : '1,7,42').split(',').map(Number);
-const ENGINES = { v1: join(dir, 'feed.v1.js'), v2: join(dir, '../extension/feed.js') };
+const seeds = (i > 0 ? process.argv[i + 1] : '1,7,42,5,99').split(',').map(Number);
+const ENGINES = { v1: join(dir, 'feed.v1.js'), v13: join(dir, 'feed.v13.js'), v2: join(dir, '../extension/feed.js') };
 // target, direction: [metric, op, limit, label]
 const TARGETS = [['lift', '>=', 1.4], ['recall', '>=', 0.72], ['wrong', '<=', 0.035], ['spam', '<=', 0.05], ['mutual', '>=', 0.93], ['hate', '<=', 0.09], ['adapt', '<=', 1.7], ['recov', '<=', 2.7], ['topics', '>=', 22], ['p95', '<', 1000], ['kb', '<=', 400]];
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
