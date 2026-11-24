@@ -9,7 +9,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const OTA_CAPABLE = ['1.1.4', '1.1.5', '1.2.0']; // every APK that ships applyOta; add new ones as they release
+const OTA_CAPABLE = ['1.1.4', '1.1.5', '1.2.0', '1.3.0']; // every APK that ships applyOta; add new ones as they release
 const fail = (msg) => (console.log('FAIL', msg), (process.exitCode = 1));
 const ok = (msg) => console.log('ok  ', msg);
 
@@ -20,6 +20,7 @@ const scriptFiles = JSON.parse(readFileSync('scripts/ota.mjs', 'utf8').match(/co
 if (appFiles.join() !== scriptFiles.join()) fail(`OTA_FILES differ: app ${appFiles} vs ota.mjs ${scriptFiles}`);
 
 const body = readFileSync('dist/ota.json');
+if (body.length > 4 * 1024 * 1024) fail('OTA payload exceeds the Android 4 MiB download limit');
 const pub = createPublicKey({ key: Buffer.from(key, 'base64'), format: 'der', type: 'spki' });
 if (!verify('sha256', body, { key: pub, dsaEncoding: 'der' }, readFileSync('dist/ota.json.sig'))) fail('signature does not verify against MainActivity.OTA_KEY');
 else ok('signature verifies against the key in shipped APKs');

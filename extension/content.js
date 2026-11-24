@@ -24,13 +24,14 @@ const shadow = T.newSession();
 const audits = new Map();
 const tabKey = crypto.randomUUID().slice(0, 12);
 function outcome(id, flags) {
-  const key = onFeed() && !onFollowing() && audits.get(id);
+  const key = onForYou() && audits.get(id);
   if (key) mutate(p => T.audit(p, key, flags));
 }
 
 // The logged-in home is "/" or "/dashboard..."; tag and blog pages are skipped because
 // every post there shares a topic or an author and would all collapse.
 const onFeed = () => location.pathname === '/' || location.pathname.startsWith('/dashboard');
+const onForYou = () => /^\/(?:dashboard(?:\/stuff_for_you)?\/?)?$/.test(location.pathname);
 const onFollowing = () => location.pathname.startsWith('/dashboard/following');
 // Following is chronological: For you's topic folds must not follow a post there.
 const keyOf = (id) => (onFollowing() ? 'f:' : 'y:') + id;
@@ -394,11 +395,11 @@ function scan() {
       if (!decisions.has(key)) {
         const now = Date.now();
         if (!posts.has(post.id)) mutate(p => T.observe(p, post, now));
-        const older = !onFollowing() && T.shadowFold(engine, shadow, post, pinned, now);
+        const older = onForYou() && T.shadowFold(engine, shadow, post, pinned, now);
         const decision = decideHere(post, now);
         decision.older = older;
         decisions.set(key, decision);
-        if (!onFollowing()) {
+        if (onForYou()) {
           const auditKey = tabKey + '-' + audits.size;
           audits.set(post.id, auditKey);
           const flags = Number(!!(settings.shapeFeed && (older || T.mutedBy(mutes, post)))) | (settings.shapeFeed && (T.mutedBy(mutes, post) || decision.action === 'collapse') ? 2 : 0);

@@ -10,7 +10,7 @@ Every Dashwell release, newest first. Downloads are on the
 - Mute and feed settings update mounted posts. Saves combine learning from multiple dashboard tabs.
 - Repeated promotions with unrelated, familiar tags can fold. One unusual tag combination alone can pass.
 - Settings show how often you open folds, press Like or Reblog, or hide posts, including where the older topic rules would have chosen differently. The comparison stays on your device. Android needs the next APK to display these figures.
-- In a five-seed simulator, spam made up 4.1% of shown posts, compared with 5.3% without an engine. The new rules showed more high-utility posts and fewer adjacent fold bars than 1.3.0.
+- In a five-seed simulator, spam made up 3.1% of shown posts, compared with 5.0% without an engine. The new rules showed more high-utility posts and fewer adjacent fold bars than 1.3.0.
 
 ## 1.3.0 · 2026-11-24 · a feed that learns what you skip
 
@@ -26,7 +26,7 @@ Every Dashwell release, newest first. Downloads are on the
 - Now and then a folded topic gets a second chance, so one bad week doesn't bury it.
 - Your learned feed profile stays on your device.
 
-Re-measured against the revised simulator over five seeds, 1.3.0 showed 79.7% of the highest-utility quarter of posts, up from 60.4% in 1.2.0. Spam made up 8.7% of its shown posts. That was more than the 5.3% without an engine and below 1.2.0’s 9.3%. These figures describe synthetic feeds.
+Re-measured against the revised simulator over five seeds, 1.3.0 showed 77.2% of the highest-utility quarter of posts, up from 62.1% in 1.2.0. Spam made up 7.0% of its shown posts, above both the 5.0% without an engine and the 6.8% in 1.2.0. These figures describe synthetic feeds.
 
 Android: updates over the air from app 1.1.4 and later; your login, settings and learned feed carry over.
 

@@ -55,13 +55,11 @@
     HIDE_HL_DAYS: 30, // "less like this" on a topic keeps it out for weeks, not minutes
     HIDE_OFF: 1.5, // decayed hides at which a topic gets no slots, only strong matches
     PARTNER: 3, // co-occurrences that make two tags partners
-    STUFFED: 4, // this many tags in one post that never appear together = tag spam
-    STUFFED_AFTER: 100,
     KNOWN_TAG: 8, // times a tag must have been seen before its lack of partners means anything // posts seen before co-occurrence is known well enough to call that
     TRUST: 0.3, // learned P(engage) of a blog above which a full topic never folds its posts
   };
   const PRIORS = [0.08, 0.25, 0.1]; // engaged, dwelled, skipped
-  const WEIGHTS = { like: 1, reblog: 2.2, comment: 2.5, expand: 1.2, dwell: 0.4 };
+  const WEIGHTS = { like: 1, reblog: 2.2, comment: 2.5, dwell: 0.4 };
   const META = new Set(['reblog', 'reblogs', 'mine', 'queued', 'queue', 'long post', 'fy', 'fyp', 'personal', 'text', 'photo', 'video', 'tumblr', 'repost']);
   // matched against `tag + ' '`, so "sob" catches "#sob" but not "#sobriety"
   const COMMENTARY = /^(i|im|i'm|my|me|you|we|he|she|they|his|her|their|our|its|it's|this|that|so|just|not|no|yes|oh|ok|okay|why|what|how|wait|omg|lol|literally|screaming|crying|sob|help|op|bro|guys|also|anyway|update|real|mood|same) /;
@@ -297,8 +295,7 @@
     for (const [t, l] of Object.entries(label)) if (hub[l] !== t) p.map[t] = hub[l];
   }
 
-  // Tags of a post that never appear together with any other tag of it. Real posts tag one subject
-  // with related tags; a post of 4+ strangers is tag spam, whatever the topics are.
+  // Count familiar tags without a familiar partner in this post. Campaign evidence corroborates this signal.
   // Only well-known tags count: on real Tumblr most tag combinations are simply unseen yet, and unseen is
   // not unrelated. Spam stuffs popular tags to reach many feeds, so it still shows up as known strangers.
   function loners(p, all) {
@@ -412,7 +409,7 @@
         p.debt[cid] = { d: 0, t: now };
         (p.boost ??= {})[cid] = now + 2 * 60 * MIN; // follow a real new obsession for the next 2h
       }
-      else addDebt(p, cid, kind === 'expand' ? -0.5 : -0.35, now);
+      else addDebt(p, cid, -0.35, now);
     }
   }
 
