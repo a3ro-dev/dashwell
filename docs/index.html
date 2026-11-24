@@ -96,6 +96,99 @@ h2 { font-size: clamp(30px, 3.6vw, 52px); line-height: 1.04; letter-spacing: -0.
 .install li::marker { color: var(--ink); font-weight: 700; }
 .note { font-size: 15px; color: var(--ink-2); max-width: 46ch; }
 
+/* before and after */
+.ba { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: clamp(28px, 5vw, 72px); align-items: start; margin-top: 48px; }
+.phones { display: grid; grid-template-columns: repeat(2, 300px); gap: 20px; }
+.phone h3 { margin: 0 0 4px; font-size: 19px; letter-spacing: -0.01em; }
+.phone .what { margin: 0 0 14px; font-size: 14px; color: var(--ink-2); }
+.feed { list-style: none; margin: 0; padding: 10px; display: grid; gap: 8px; border-radius: 26px; background: #0a1a22; box-shadow: 0 0 0 1px var(--line), 0 30px 60px #00000066; }
+.post, .bar { position: relative; border-radius: 14px; background: var(--raised); font-size: 14px; line-height: 1.35; }
+.post { padding: 11px 12px 12px; }
+.who { display: flex; align-items: center; gap: 8px; font-weight: 650; }
+.who i { flex: none; width: 18px; height: 18px; border-radius: 50%; background: #ffffff26; }
+.ln { display: block; height: 6px; width: 78%; border-radius: 3px; background: #ffffff14; margin: 9px 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px 6px; font-size: 12px; color: var(--ink-2); }
+.tags span { padding: 1px 8px; border-radius: 10px; background: #ffffff12; }
+.why { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 9px 9px 14px; }
+.bar b { font-weight: 600; font-size: 13px; line-height: 1.3; }
+.bar span.show { flex: none; padding: 5px 13px; border-radius: 16px; background: #ffffff17; font-weight: 650; font-size: 13px; }
+.diff { box-shadow: inset 3px 0 0 var(--ink); }
+.badge { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--ground); font-size: 12px; font-weight: 800; font-style: normal; }
+.bar .badge { margin-right: 8px; }
+.post .badge { position: absolute; top: 10px; right: 10px; }
+.bar > div { display: flex; align-items: center; }
+.notes { list-style: none; margin: 0; padding: 0; }
+.notes li { display: flex; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--line); font-size: 17px; line-height: 1.45; }
+.notes li:first-child { padding-top: 0; }
+.notes .badge { margin-top: 3px; }
+.notes b { font-weight: 700; }
+.notes span.t { display: block; color: var(--ink-2); font-size: 15px; margin-top: 3px; }
+.legend-line { margin: 18px 0 0; font-size: 14px; color: var(--ink-2); }
+.bench { margin-top: 80px; max-width: 860px; }
+.bench h3 { margin: 0 0 6px; font-size: 26px; letter-spacing: -0.02em; line-height: 1.15; }
+.bench > p.sub { font-size: 17px; margin-bottom: 18px; }
+table.cmp { width: 100%; border-collapse: collapse; font-size: 16px; font-variant-numeric: tabular-nums; }
+.cmp th, .cmp td { padding: 12px 10px; border-bottom: 1px solid var(--line); text-align: right; }
+.cmp thead th { color: var(--ink-2); font-weight: 600; font-size: 14px; white-space: nowrap; }
+.cmp tbody th { text-align: left; font-weight: 600; padding-left: 0; }
+.cmp tbody th small { display: block; font-weight: 400; color: var(--ink-2); font-size: 13px; line-height: 1.35; }
+.cmp td { color: var(--ink-2); }
+.cmp td .v { display: inline-block; min-width: 3.4em; padding: 3px 8px; border-radius: 8px; }
+.cmp td.best { color: var(--ink); font-weight: 800; }
+.cmp td.best .v { background: #ffffff24; }
+.cmp .ceil { opacity: .65; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.bench .note { margin: 16px 0 0; max-width: 64ch; }
+#bench-status { min-height: 1.6em; margin-top: 6px; }
+
+/* how it decides */
+.flow { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: clamp(28px, 5vw, 72px); margin-top: 44px; align-items: start; }
+.stages { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+.stages li { position: relative; padding: 0 0 20px 56px; counter-increment: s; }
+.stages li:last-child { padding-bottom: 0; }
+.stages li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: var(--raised); box-shadow: inset 0 0 0 1.5px #ffffff3d; font-weight: 700; font-size: 15px; animation: step 12s infinite; animation-delay: calc(var(--i) * 2s); }
+.stages li::after { content: ""; position: absolute; left: 16.5px; top: 40px; bottom: 6px; width: 1px; background: var(--line); }
+.stages li:last-child::after { display: none; }
+.stages b { display: block; font-size: 19px; line-height: 1.3; margin-bottom: 2px; }
+.stages span { display: block; color: var(--ink-2); font-size: 16px; line-height: 1.45; max-width: 46ch; }
+.stages q { color: var(--ink); quotes: none; }
+@keyframes step { 0%, 15%, 100% { background: var(--raised); box-shadow: inset 0 0 0 1.5px #ffffff3d; } 4%, 12% { background: #1c3743; box-shadow: inset 0 0 0 1.5px #ffffffcc; } }
+.score { padding: 26px; border-radius: 22px; background: var(--raised); box-shadow: 0 0 0 1px var(--line); }
+.score h3 { margin: 0 0 4px; font-size: 19px; letter-spacing: -0.01em; }
+.score p { margin: 0 0 18px; font-size: 14px; color: var(--ink-2); }
+.heads { list-style: none; margin: 0 0 6px; padding: 0; display: grid; gap: 12px; }
+.heads li { display: grid; grid-template-columns: minmax(0, 1fr) 24px; gap: 4px 10px; align-items: center; font-size: 15px; }
+.heads .bartrack { grid-column: 1; height: 8px; border-radius: 4px; background: #ffffff12; overflow: hidden; }
+.heads .bartrack i { display: block; height: 100%; border-radius: 4px; background: var(--ink); }
+.heads .neg i { background: repeating-linear-gradient(135deg, var(--ink-2) 0 3px, transparent 3px 6px); }
+.heads .sign { grid-row: 1 / span 2; grid-column: 2; font-size: 20px; font-weight: 700; text-align: center; color: var(--ink-2); }
+.score .sum { margin: 0 0 22px; padding-top: 10px; border-top: 1px solid var(--line); font-weight: 700; font-size: 15px; }
+.band { display: flex; height: 38px; border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+.band i { display: block; }
+.band .lo { flex: 15; background: repeating-linear-gradient(135deg, #ffffff2e 0 4px, transparent 4px 8px); }
+.band .mid { flex: 70; background: #ffffff0f; }
+.band .hi { flex: 15; background: #ffffff47; }
+.axis { display: flex; justify-content: space-between; margin: 6px 0 14px; font-size: 12.5px; color: var(--ink-2); }
+.key { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; color: var(--ink-2); }
+.key b { color: var(--ink); font-weight: 650; }
+.local { margin: 40px 0 0; padding-top: 22px; border-top: 1px solid var(--line); max-width: 66ch; font-size: 18px; color: var(--ink-2); }
+.local b { color: var(--ink); font-weight: 650; }
+
+/* what's new */
+.log { margin-top: 36px; max-width: 860px; min-height: 760px; }
+.log > p { margin: 0; }
+.rel { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 32px; padding: 22px 0; border-top: 1px solid var(--line); }
+.rel h3 { margin: 0; font-size: 24px; letter-spacing: -0.02em; line-height: 1.2; }
+.rel time { display: block; color: var(--ink-2); font-size: 14px; margin-top: 2px; }
+.rel .t { margin: 0 0 8px; font-weight: 650; }
+.rel ul { margin: 0; padding-left: 20px; color: var(--ink-2); }
+.rel li { margin-bottom: 6px; line-height: 1.5; }
+.rel li b { color: var(--ink); font-weight: 650; }
+.log details summary { cursor: pointer; padding: 18px 0; border-top: 1px solid var(--line); font-weight: 650; }
+.log details summary:focus-visible { outline: 2px solid var(--lamp); outline-offset: 3px; border-radius: 6px; }
+.log .more { margin: 22px 0 0; font-size: 15px; color: var(--ink-2); }
+
 footer { border-top: 1px solid var(--line); padding: 40px 0 56px; color: var(--ink-2); font-size: 14px; }
 footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px 40px; }
 footer nav { display: flex; flex-wrap: wrap; gap: 18px; }
@@ -113,7 +206,25 @@ footer p { margin: 0; max-width: 60ch; }
   .fold { font-size: 14px; left: 4%; right: 4%; }
   section.block { padding: 72px 0; }
 }
+@media (max-width: 1000px) {
+  .ba, .flow { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  .phones { grid-template-columns: minmax(0, 340px); }
+  .rel { grid-template-columns: minmax(0, 1fr); }
+  .bench { margin-top: 64px; }
+  .log { min-height: 1100px; }
+}
+@media (max-width: 520px) {
+  .log { min-height: 1340px; }
+  .cmp th, .cmp td { padding: 10px 4px; }
+  .cmp { font-size: 15px; }
+  .cmp td .v { padding: 3px 4px; min-width: 0; }
+  .cmp .ceil { display: none; }
+  .score { padding: 20px; }
+}
 @media (prefers-reduced-motion: reduce) {
+  .stages li::before { animation: none; }
   .fold { animation: none; }
   .btn { transition: none; }
 }
@@ -127,6 +238,9 @@ footer p { margin: 0; max-width: 60ch; }
   </a>
   <nav aria-label="Site">
     <a class="hide-sm" href="#how">how it works</a>
+    <a class="hide-sm" href="#before-after">before and after</a>
+    <a class="hide-sm" href="#how-it-decides">how it decides</a>
+    <a class="hide-sm" href="#changelog">what's new</a>
     <a href="#install">install</a>
     <a href="https://github.com/a3ro-dev/dashwell">github</a>
   </nav>
@@ -194,6 +308,125 @@ footer p { margin: 0; max-width: 60ch; }
       <p>it's not ai and it doesn't phone home. it's a small bit of javascript that runs on your device and keeps a note of the tags you scroll past, like and reblog.</p>
       <p>every topic gets a fair share of your dash based on what you've liked over months, not your last tap, so one like on something new gets maybe 2 posts in every 16 instead of your entire evening. if you keep scrolling past something it cools down for a bit, and if you like three posts about a new show in one go it figures that's a real new obsession and lets it in. it also works out that #black holes and #space are basically the same topic from how people tag things, which honestly was the fun part.</p>
       <p>the maths comes from actual recommender research (calibrated recommendations, satiation, tie strength) and the whole thing is in <code>feed.js</code> if you want to read it.</p>
+    </div>
+  </section>
+
+  <section class="block" id="before-after">
+    <div class="wrap">
+      <h2>the same ten posts, before and after</h2>
+      <p class="sub">dashwell 1.2.0 folds a post when its topic is full. the next version, 1.3.0, also asks how much you'd care about it. same posts in, different decisions out.</p>
+      <div class="ba">
+        <div class="phones">
+          <div class="phone">
+            <h3>1.2.0 · v1</h3>
+            <p class="what">folds when a topic is full</p>
+            <ol class="feed">
+              <li class="post"><div class="who"><i></i>starfield-daily</div><span class="ln"></span><div class="tags"><span>#space</span><span>#black holes</span></div></li>
+              <li class="post"><div class="who"><i></i>birdsofdusk</div><span class="ln"></span><div class="tags"><span>#bird watching</span><span>#owls</span></div></li>
+              <li class="post"><div class="who"><i></i>orbitalgarden</div><span class="ln"></span><div class="tags"><span>#space</span><span>#telescope</span></div></li>
+              <li class="post diff"><i class="badge">A</i><div class="who"><i></i>tagfarm-4000</div><span class="ln"></span><div class="tags"><span>#space</span><span>#recipes</span><span>#pottery</span><span>#marvel</span><span>#cats</span><span>#fyp</span></div></li>
+              <li class="bar diff"><div><i class="badge">B</i><b>You've seen a lot of #space lately</b></div><span class="show">Show</span></li>
+              <li class="post"><div class="who"><i></i>clayandkiln</div><span class="ln"></span><div class="tags"><span>#pottery</span><span>#glaze</span></div></li>
+              <li class="post diff"><i class="badge">C</i><div class="who"><i></i>neonvelvet</div><span class="ln"></span><div class="tags"><span>#hazbin hotel</span><span>#fanart</span></div></li>
+              <li class="post"><div class="who"><i></i>frame-by-frame</div><span class="ln"></span><div class="tags"><span>#marvel</span><span>#mcu</span></div></li>
+              <li class="bar"><div><b>You've seen a lot of #marvel lately</b></div><span class="show">Show</span></li>
+              <li class="post"><div class="who"><i></i>kettle-notes</div><span class="ln"></span><div class="tags"><span>#recipes</span><span>#soup</span></div></li>
+            </ol>
+          </div>
+          <div class="phone">
+            <h3>1.3.0 · v2</h3>
+            <p class="what">folds by how much you'd care</p>
+            <ol class="feed">
+              <li class="post"><div class="who"><i></i>starfield-daily</div><span class="ln"></span><div class="tags"><span>#space</span><span>#black holes</span></div></li>
+              <li class="post"><div class="who"><i></i>birdsofdusk</div><span class="ln"></span><div class="tags"><span>#bird watching</span><span>#owls</span></div></li>
+              <li class="post"><div class="who"><i></i>orbitalgarden</div><span class="ln"></span><div class="tags"><span>#space</span><span>#telescope</span></div></li>
+              <li class="bar diff"><div><i class="badge">A</i><b>You usually scroll past posts like this</b></div><span class="show">Show</span></li>
+              <li class="post diff"><i class="badge">B</i><div class="who"><i></i>moth-and-lantern</div><span class="ln"></span><div class="tags"><span>#space</span><span>#nebula</span></div><p class="why">strong match, shown though #space is full</p></li>
+              <li class="post"><div class="who"><i></i>clayandkiln</div><span class="ln"></span><div class="tags"><span>#pottery</span><span>#glaze</span></div></li>
+              <li class="bar diff"><div><i class="badge">C</i><b>You usually scroll past posts like this</b></div><span class="show">Show</span></li>
+              <li class="post"><div class="who"><i></i>frame-by-frame</div><span class="ln"></span><div class="tags"><span>#marvel</span><span>#mcu</span></div></li>
+              <li class="bar"><div><b>You've seen a lot of #marvel lately</b></div><span class="show">Show</span></li>
+              <li class="post"><div class="who"><i></i>kettle-notes</div><span class="ln"></span><div class="tags"><span>#recipes</span><span>#soup</span></div></li>
+            </ol>
+          </div>
+        </div>
+        <div>
+          <ul class="notes">
+            <li><i class="badge">A</i><div><b>a tag-stuffed post.</b><span class="t">six unrelated tags to get seen. v1 counts it as a #space post and lets it through. v2 has learned that you scroll past posts like it, and folds it.</span></div></li>
+            <li><i class="badge">B</i><div><b>a blog you love, on a full topic.</b><span class="t">v1 only sees that #space is full, so it folds the post. v2 sees it's one of the posts you'd care about most and lets it past.</span></div></li>
+            <li><i class="badge">C</i><div><b>a topic you keep scrolling past.</b><span class="t">v1 gives it an equal share until your session says otherwise. v2 remembers across sessions and folds it.</span></div></li>
+          </ul>
+          <p class="legend-line">an example, hand-written to show the idea. the bar on the left edge marks a post the two versions treat differently.</p>
+        </div>
+      </div>
+
+      <div class="bench">
+        <h3>the numbers</h3>
+        <p class="sub">both versions run against the same simulated posts and the same simulated readers.</p>
+        <table class="cmp" id="cmp">
+          <caption class="sr">dashwell feed engine results from the simulator: no engine, version 1, version 2 and an ideal ceiling</caption>
+          <thead>
+            <tr><th scope="col"><span class="sr">what is measured</span></th><th scope="col">no engine</th><th scope="col">v1 · 1.2.0</th><th scope="col">v2 · 1.3.0</th><th scope="col" class="ceil">ceiling</th></tr>
+          </thead>
+          <tbody>
+            <tr data-k="precision" data-better="high"><th scope="row">picks you'd like<small>shown posts that beat your own median</small></th><td data-e="none"><span class="v">–</span></td><td data-e="v1"><span class="v">–</span></td><td data-e="v2"><span class="v">–</span></td><td class="ceil" data-e="oracle"><span class="v">–</span></td></tr>
+            <tr data-k="recall" data-better="high"><th scope="row">good posts still shown<small>your top quarter of posts that weren't folded</small></th><td data-e="none"><span class="v">–</span></td><td data-e="v1"><span class="v">–</span></td><td data-e="v2"><span class="v">–</span></td><td class="ceil" data-e="oracle"><span class="v">–</span></td></tr>
+            <tr data-k="wrongPct" data-better="low"><th scope="row">wrongly hidden<small>folded posts you'd have liked</small></th><td data-e="none"><span class="v">–</span></td><td data-e="v1"><span class="v">–</span></td><td data-e="v2"><span class="v">–</span></td><td class="ceil" data-e="oracle"><span class="v">–</span></td></tr>
+            <tr data-k="spamPct" data-better="low"><th scope="row">spam you see<small>share of shown posts from tag-stuffed blogs</small></th><td data-e="none"><span class="v">–</span></td><td data-e="v1"><span class="v">–</span></td><td data-e="v2"><span class="v">–</span></td><td class="ceil" data-e="oracle"><span class="v">–</span></td></tr>
+            <tr data-k="mutualPct" data-better="high"><th scope="row">mutuals shown<small>posts from blogs you love, not folded</small></th><td data-e="none"><span class="v">–</span></td><td data-e="v1"><span class="v">–</span></td><td data-e="v2"><span class="v">–</span></td><td class="ceil" data-e="oracle"><span class="v">–</span></td></tr>
+            <tr data-k="hatePct" data-better="low"><th scope="row">a topic you dislike<small>its share of what you see</small></th><td data-e="none"><span class="v">–</span></td><td data-e="v1"><span class="v">–</span></td><td data-e="v2"><span class="v">–</span></td><td class="ceil" data-e="oracle"><span class="v">–</span></td></tr>
+            <tr data-k="foldPct"><th scope="row">posts folded<small>for context, not better or worse</small></th><td data-e="none"><span class="v">–</span></td><td data-e="v1"><span class="v">–</span></td><td data-e="v2"><span class="v">–</span></td><td class="ceil" data-e="oracle"><span class="v">–</span></td></tr>
+          </tbody>
+        </table>
+        <p class="note" id="bench-status" aria-live="polite"></p>
+        <p class="note">these come from a simulator with synthetic users, so they compare engines rather than predict your feed. the ceiling folds the same amount but knows exactly what each reader likes. the simulator and the engine are in the <a href="https://github.com/a3ro-dev/dashwell/tree/main/bench">repo</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="how-it-decides">
+    <div class="wrap">
+      <h2>how it decides, one post at a time</h2>
+      <p class="sub">this is what happens to every post on your dash, in order.</p>
+      <div class="flow">
+        <ol class="stages">
+          <li style="--i:0"><b>a post arrives</b><span>one at a time, as you scroll.</span></li>
+          <li style="--i:1"><b>the quick checks</b><span>muted words, #tags and @blogs go first. repeat reblogs collapse. blogs you always like take the mutual fast lane and are never folded.</span></li>
+          <li style="--i:2"><b>a learned value</b><span>three small guesses, made on your device: will you engage with it, will you read it, will you scroll past or hide it. they combine into one score. until it has seen enough of you it sticks to topic balance.</span></li>
+          <li style="--i:3"><b>the two ends</b><span>the posts at the bottom, about the lowest 15% by score, fold. the top 15% get past a full topic.</span></li>
+          <li style="--i:4"><b>topic balance and author limits</b><span>everything in between is shared out by your long-term interests, and no blog gets more than 2 posts in 16.</span></li>
+          <li style="--i:5"><b>a line saying why</b><span>every fold explains itself: <q>You usually scroll past posts like this · Show</q>. tap show and it learns that too.</span></li>
+        </ol>
+        <div class="score" role="group" aria-labelledby="score-h">
+          <h3 id="score-h">one post, one score</h3>
+          <p>an example, not a real post.</p>
+          <ul class="heads">
+            <li>you'll engage<span class="sign" aria-hidden="true">+</span><span class="bartrack"><i style="width:72%"></i></span></li>
+            <li>you'll read it<span class="sign" aria-hidden="true">+</span><span class="bartrack"><i style="width:46%"></i></span></li>
+            <li class="neg">you'll scroll past or hide it<span class="sign" aria-hidden="true">−</span><span class="bartrack"><i style="width:28%"></i></span></li>
+          </ul>
+          <p class="sum">= one score</p>
+          <div class="band" role="img" aria-label="all posts ordered by score: the lowest 15% fold, the middle follows the usual topic limits, the top 15% get past a full topic"><i class="lo"></i><i class="mid"></i><i class="hi"></i></div>
+          <div class="axis" aria-hidden="true"><span>lower score</span><span>higher score</span></div>
+          <ul class="key">
+            <li><b>lowest 15%:</b> fold</li>
+            <li><b>the middle:</b> usual topic and author limits</li>
+            <li><b>top 15%:</b> can get past a full topic</li>
+          </ul>
+        </div>
+      </div>
+      <p class="local"><b>it learns on your device only.</b> nothing leaves your phone or browser. tapping <b>less like this</b> teaches it, and so does scrolling past a post fast, along with likes, reblogs and opening a fold.</p>
+    </div>
+  </section>
+
+  <section class="block" id="changelog">
+    <div class="wrap">
+      <h2>what's new</h2>
+      <p class="sub">every release, newest first. updating keeps your login and settings.</p>
+      <div class="log" id="log" aria-live="polite">
+        <p class="note" id="log-msg">loading the changelog…</p>
+        <noscript><p class="note">the changelog needs javascript here. it's on <a href="https://github.com/a3ro-dev/dashwell/blob/main/CHANGELOG.md">github</a> too.</p></noscript>
+      </div>
     </div>
   </section>
 
@@ -278,6 +511,46 @@ footer p { margin: 0; max-width: 60ch; }
   resize(); addEventListener('resize', () => { resize(); if (still) draw(0); });
   new IntersectionObserver(([e]) => { const was = visible; visible = e.isIntersecting; if (visible && !was && !still) requestAnimationFrame(draw); }).observe(canvas);
   requestAnimationFrame(draw);
+})();
+
+// The numbers table and the changelog read bench.json and changelog.json (written by
+// scripts/site-numbers.mjs). The page is complete without them: rows and space are reserved.
+const getJSON = (url) => fetch(url).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+
+(async () => {
+  const status = document.getElementById('bench-status');
+  try {
+    const d = (await getJSON('bench.json')).engines;
+    const fmt = (k, x) => x == null ? '–' : k === 'lift' ? x.toFixed(2) + '×' : (x < 10 ? x.toFixed(1) : Math.round(x)) + '%';
+    document.querySelectorAll('#cmp tbody tr').forEach((tr) => {
+      const k = tr.dataset.k, cell = {};
+      tr.querySelectorAll('td').forEach((td) => { const e = d[td.dataset.e]; td.firstElementChild.textContent = fmt(k, e && e[k]); cell[td.dataset.e] = td; });
+      const a = d.v1 && d.v1[k], b = d.v2 && d.v2[k];
+      if (!tr.dataset.better || a == null || b == null || a === b) return;
+      const win = cell[(b < a) === (tr.dataset.better === 'low') ? 'v2' : 'v1'];
+      win.classList.add('best');
+      win.firstElementChild.insertAdjacentHTML('beforeend', '<span class="sr"> (better)</span>');
+    });
+    if (!d.v2) status.textContent = 'v2 numbers coming with 1.3.0.';
+  } catch (e) {
+    status.textContent = "couldn't load the numbers. they're in bench/ on github.";
+  }
+})();
+
+(async () => {
+  const box = document.getElementById('log');
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const item = (s) => '<li>' + esc(s).replace(/^(New|Fix): /, '<b>$1:</b> ') + '</li>';
+  const rel = (r) => '<article class="rel"><div><h3>' + r.version + '</h3><time datetime="' + r.date + '">' + r.date + '</time></div><div>' +
+    (r.title ? '<p class="t">' + esc(r.title) + '</p>' : '') + '<ul>' + r.items.map(item).join('') + '</ul></div></article>';
+  try {
+    const all = await getJSON('changelog.json');
+    box.innerHTML = all.slice(0, 3).map(rel).join('') +
+      (all.length > 3 ? '<details><summary>older releases (' + (all.length - 3) + ')</summary>' + all.slice(3).map(rel).join('') + '</details>' : '') +
+      '<p class="note">the full list is <a href="https://github.com/a3ro-dev/dashwell/blob/main/CHANGELOG.md">CHANGELOG.md</a> on github. downloads are on the <a href="https://github.com/a3ro-dev/dashwell/releases">releases page</a>.</p>';
+  } catch (e) {
+    box.innerHTML = '<p class="note">couldn\'t load the changelog here. it\'s on <a href="https://github.com/a3ro-dev/dashwell/blob/main/CHANGELOG.md">github</a>, and downloads are on the <a href="https://github.com/a3ro-dev/dashwell/releases">releases page</a>.</p>';
+  }
 })();
 </script>
 </body>
