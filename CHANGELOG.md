@@ -3,23 +3,30 @@
 Every Dashwell release, newest first. Downloads are on the
 [releases page](https://github.com/a3ro-dev/dashwell/releases). Updating keeps your login and settings.
 
+## 1.3.1 · 2026-11-25 · gentler folds and clearer feedback
+
+- Dashwell counts reading time while the tab is visible. Preloaded posts can reach your screen before their reblogs count as repeats.
+- Show opens a post for inspection. Undo within ten seconds cancels the whole “less like this” signal.
+- Mute and feed settings update mounted posts. Saves combine learning from multiple dashboard tabs.
+- Repeated promotions with unrelated, familiar tags can fold. One unusual tag combination alone can pass.
+- Settings show how often you open folds, press Like or Reblog, or hide posts, including where the older topic rules would have chosen differently. The comparison stays on your device. Android needs the next APK to display these figures.
+- In a five-seed simulator, spam made up 4.1% of shown posts, compared with 5.3% without an engine. The new rules showed more high-utility posts and fewer adjacent fold bars than 1.3.0.
+
 ## 1.3.0 · 2026-11-24 · a feed that learns what you skip
 
 **New**
 - The feed now learns what you actually do with posts, not just what you like: what you read,
-  what you scroll straight past, what you hide. Posts you'd almost certainly skip fold with a reason
+  what you scroll straight past, what you hide. Some posts similar to ones you scrolled past fold with a reason
   ("You usually scroll past posts like this · Show"); posts that are a strong match get through even
   when their topic is busy.
 - Tag-stuffed spam (posts tagged with a pile of unrelated fandoms) folds.
 - Reblogs of a post you already saw stay folded across visits, not just within one.
 - "Less like this" lasts for weeks instead of half an hour.
-- Mutuals and blogs you always engage with are recognised faster and aren't folded for crowding.
+- Mutuals and blogs you always engage with are recognised faster and get extra room in a crowded feed.
 - Now and then a folded topic gets a second chance, so one bad week doesn't bury it.
-- Everything is still learned on your device. Nothing is uploaded.
+- Your learned feed profile stays on your device.
 
-In our simulator with synthetic users, compared with 1.2.0: about 20% better picks, about a fifth more of
-the good posts shown, half as many posts wrongly hidden, about a quarter less spam, and posts from loved mutuals
-shown 96% of the time (was 87%). Simulated, so it compares engines rather than predicting your feed.
+Re-measured against the revised simulator over five seeds, 1.3.0 showed 79.7% of the highest-utility quarter of posts, up from 60.4% in 1.2.0. Spam made up 8.7% of its shown posts. That was more than the 5.3% without an engine and below 1.2.0’s 9.3%. These figures describe synthetic feeds.
 
 Android: updates over the air from app 1.1.4 and later; your login, settings and learned feed carry over.
 
@@ -86,7 +93,7 @@ New feed engine built from published recommender-systems research.
   your new obsession.
 - Tags are grouped on-device by co-occurrence (#black holes counts toward #space).
 - Joke tags are ignored, repeat reblogs collapse, max 2 posts per blog per 16, 1 discovery slot in 10.
-- Mutuals are found by tie strength relative to how much they post, and never collapsed.
+- Mutuals are found by tie strength relative to how much they post, and given priority.
 - Every decision explains itself; Show anyway teaches it.
 
 ## 0.1.1 · 2026-11-18

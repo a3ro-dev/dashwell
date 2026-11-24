@@ -47,7 +47,8 @@ write('docs/bench.json', {
   engines: {
     none: pick(base, 'baseline', 'no engine'),
     v1: pick(base, 'engine', 'v1 (1.2.0)'),
-    v2: v2 ? pick(v2, 'engine', 'v2 (1.3.0)') : null,
+    v13: sum?.v13 ? pick(one('v13'), 'engine', '1.3.0') : null,
+    v2: v2 ? pick(v2, 'engine', '1.3.1') : null,
     oracle: pick(v2 || base, 'oracle', 'oracle'),
   },
 });
