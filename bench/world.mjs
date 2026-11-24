@@ -113,8 +113,9 @@ export function makeFeed(world, follows, r) {
       const dup = seenRoots.has(rootId);
       seenRoots.add(rootId);
       let tags = tagsFor(world, r, topic, !!root, spam);
-      const body = spam ? 'New prints available this week at my shop' : 'I keep thinking about ' + r.pick(topic.co);
-      const destination = spam ? 'https://' + blog.name + '.example/shop' : '';
+      const promoting = spam || r.chance(0.07);
+      const body = promoting ? 'New prints available this week at my shop' : 'I keep thinking about ' + r.pick(topic.co);
+      const destination = promoting ? 'https://' + blog.name + '.example/shop' : '';
       if (r.chance(0.18)) tags = tags.slice(0, 1);
       return { topic: topic.id, kind: blog.kind, dup, view: { id, blog: blog.name, root: rootId, trail: root ? [root.blog] : [], tags, body, destination, text: body } };
     },

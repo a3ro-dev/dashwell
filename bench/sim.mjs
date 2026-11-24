@@ -58,7 +58,7 @@ export function runEngine(T, trace, label = '', engine = T.emptyProfile()) {
   const times = [];
   const decisions = [];
   const folded = trace.map(({ s, now, post, viewed }, idx) => {
-    while (delayed.length && delayed[0].at <= idx) delayed.shift().apply();
+    while (delayed.length && delayed[0].at <= idx) delayed.shift().apply(now);
     if (s !== lastS) ((session = T.newSession()), (session.rand = rand), (lastS = s));
     const t0 = performance.now();
     T.observe(engine, post.view, now);
@@ -74,14 +74,14 @@ export function runEngine(T, trace, label = '', engine = T.emptyProfile()) {
       T.remember?.(engine, post.view.root);
       const current = session;
       const kinds = [...(fold ? ['expand'] : []), ...(a.hide ? ['hide'] : a.skip ? ['skip'] : read)];
-      delayed.push({ at: idx + 3, apply() {
-        for (const k of kinds) T.recordInteraction(engine, current, post.view, k, now);
-        T.learnImpression?.(engine, current, post.view, { engaged: !!((fold && !T.remember) || a.like || a.reblog), expanded: fold, dwell: a.dwell, skip: a.skip, hide: a.hide }, now);
+      delayed.push({ at: idx + 3, apply(delivered) {
+        for (const k of kinds) T.recordInteraction(engine, current, post.view, k, delivered);
+        T.learnImpression?.(engine, current, post.view, { engaged: !!((fold && !T.remember) || a.like || a.reblog), expanded: fold, dwell: a.dwell, skip: a.skip, hide: a.hide }, delivered);
       } });
     }
     return fold;
   });
-  for (const entry of delayed) entry.apply();
+  for (const entry of delayed) entry.apply(trace.at(-1).now);
   times.sort((x, y) => x - y);
   return { folded, decisions, us: (ms * 1000) / trace.length, p95us: times[Math.floor(0.95 * (times.length - 1))] * 1000, kb: JSON.stringify(engine).length / 1024 };
 }
@@ -192,7 +192,9 @@ async function main() {
       runEngine(legacy, trace.filter(t => t.s < 3), 'migration', profile);
       const next = trace.filter(t => t.s === 3);
       const migrated = runEngine(T, next, 'migration', JSON.parse(JSON.stringify(profile)));
-      runs.engine[persona].push({ migrated20: evaluate(next, migrated.folded, user).first20, ...evaluate(trace, eng.folded, user), us: eng.us, p95: eng.p95us, kb: eng.kb });
+      const genuine = trace.filter(t => t.viewed && t.post.kind !== 'spam').length;
+      const falseSpam = eng.decisions.filter((d,i) => trace[i].viewed && trace[i].post.kind !== 'spam' && /tag-stuffed/.test(d.reason)).length;
+      runs.engine[persona].push({ falseSpam: falseSpam / genuine, migrated20: evaluate(next, migrated.folded, user).first20, ...evaluate(trace, eng.folded, user), us: eng.us, p95: eng.p95us, kb: eng.kb });
       runs.oracle[persona].push(evaluate(trace, runOracle(trace, rate), user));
     }
   const results = {};

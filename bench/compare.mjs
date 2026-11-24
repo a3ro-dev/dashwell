@@ -34,7 +34,7 @@ for (const name of Object.keys(ENGINES))
     perSeed: Object.fromEntries(seeds.map((s, k) => [s, runs[name][k].engine.overall])),
     personas: Object.fromEntries(personas.map((p) => [p, avg(runs[name], (r) => r.engine.personas[p])])),
   };
-summary.baseline = { overall: avg(runs.v2, (r) => r.baseline.overall) };
+summary.baseline = { overall: avg(runs.v2, (r) => r.baseline.overall), perSeed: Object.fromEntries(seeds.map((s,i) => [s, runs.v2[i].baseline.overall])) };
 summary.oracle = { overall: avg(runs.v2, (r) => r.oracle.overall) };
 const ok = (m, op, lim, v) => (op === '>=' ? v >= lim : op === '<=' ? v <= lim : v < lim);
 const targets = TARGETS.map(([m, op, lim]) => ({ metric: m, op, limit: lim, v1: summary.v1.overall[m], v2: summary.v2.overall[m], pass: ok(m, op, lim, summary.v2.overall[m]), perSeedPass: seeds.every((s) => ok(m, op, lim, summary.v2.perSeed[s][m])) }));
@@ -45,7 +45,7 @@ const f = (v, d) => (v == null ? '-' : d === 'p' ? (v * 100).toFixed(1) : v.toFi
 const row = (label, m) => label.padEnd(20) + COLS.map(([k, , d]) => f(m[k], d)).join('');
 console.log(`seeds ${seeds.join(', ')}, ${3} users per persona, mean over seeds\n`);
 console.log('policy'.padEnd(20) + COLS.map(([, h]) => h.padStart(7)).join(''));
-for (const [label, m] of [['baseline (no engine)', summary.baseline.overall], ['v1 engine', summary.v1.overall], ['v2 engine', summary.v2.overall], ['oracle (v2 rate)', summary.oracle.overall]]) console.log(row(label, m));
+for (const [label, m] of [['baseline (no engine)', summary.baseline.overall], ['1.2.0', summary.v1.overall], ['1.3.0', summary.v13.overall], ['1.3.1', summary.v2.overall], ['oracle (v2 rate)', summary.oracle.overall]]) console.log(row(label, m));
 for (const s of seeds) console.log(row(`  v2 seed ${s}`, summary.v2.perSeed[s]));
 for (const p of personas) {
   console.log('');
