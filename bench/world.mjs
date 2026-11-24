@@ -1,6 +1,8 @@
 // Synthetic Tumblr: topics with tag vocabularies, blogs with heavy-tailed posting rates,
 // reblog cascades, and a For-you-like candidate stream. Nothing here knows about the engine.
 
+import { tagTopics, tumblrPosts } from './tumblr-data.mjs';
+
 function hash(s) {
   let h = 2166136261;
   for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
@@ -39,26 +41,15 @@ export function makeRng(seed) {
   return r;
 }
 
-const HUBS = ['star trek', 'elden ring', 'taylor swift', 'formula 1', 'hollow knight', 'the bear', 'dungeons and dragons', 'astronomy', 'birdwatching', 'sourdough', 'houseplants', 'knitting', 'linguistics', 'fountain pens', 'mechanical keyboards', 'retro games', 'jazz', 'k-pop', 'studio ghibli', 'marvel', 'doctor who', 'sherlock', 'oceanography', 'tarot', 'ceramics', 'film photography', 'urbanism', 'cats', 'gardening', 'thrifting', 'minecraft', 'genshin impact', 'arcane', 'one piece', 'horror movies', 'poetry', 'medieval history', 'bookbinding', 'tabletop rpg', 'cycling', 'chess', 'mycology', 'fashion history', 'synthwave', 'linux', 'anime', 'crochet', 'baking', 'vinyl records', 'pokemon', 'zelda', 'true crime', 'dinosaurs', 'cottagecore', 'vtubers', 'soccer', 'dune', 'lord of the rings', 'disco elysium', 'skincare'];
-const SUFFIX = ['fanart', 'memes', 'headcanons', 'aesthetic', 'edit', 'gifs', 'quotes', 'theory', 'appreciation', 'analysis', 'art', 'cosplay', 'playlist', 'discourse', 'lore'];
-const SYL = ['ka', 'mi', 'ra', 'jo', 'el', 'sun', 'vi', 'tor', 'ne', 'lu', 'ash', 'bri', 'dan', 'ori', 'zel', 'mar'];
-const GENERIC = ['art', 'aesthetic', 'music', 'books', 'games', 'funny']; // shared across topics: ambiguous bridge tags
-// Commentary the engine's regex knows ("i'm screaming") and commentary it does not ("iconic").
-const COMMENT = ["i'm screaming", 'this is so me', 'not me crying', 'literally', 'help', 'oh my god', 'why is this so accurate', 'my beloved', 'wait what', 'same', 'so true', 'ugh', 'blessed', 'iconic', 'unhinged', 'aaaaaa', 'fandom problems', 'good vibes', 'thoughts'];
-const META = ['reblog', 'fyp', 'long post', 'personal', 'text', 'photo', 'queue', 'tumblr'];
+let vocabulary;
 const ADJ = ['moon', 'salt', 'velvet', 'paper', 'ghost', 'honey', 'pixel', 'rust', 'amber', 'quiet', 'soft', 'wild', 'neon', 'dusty', 'lunar', 'cobalt', 'mossy', 'tiny', 'blue', 'sleepy'];
 const NOUN = ['fox', 'garden', 'archive', 'witch', 'bones', 'bird', 'tea', 'radio', 'robot', 'library', 'moth', 'jam', 'static', 'bread', 'lamp', 'crow', 'thread', 'pond', 'cloud', 'ink'];
 
 export function makeWorld(seed) {
   const r = makeRng(`${seed}:world`);
-  const name = () => r.pick(SYL) + r.pick(SYL) + (r.chance(0.3) ? r.pick(SYL) : '');
-  const order = r.shuffle(HUBS.map((_, i) => i)); // order[0] is the most popular topic
-  const topics = HUBS.map((hub, id) => {
-    const co = new Set();
-    const n = 3 + r.int(6); // hub tag + 3-8 co-occurring tags
-    while (co.size < n) co.add(r.chance(0.4) ? `${hub} ${r.pick(SUFFIX)}` : r.chance(0.12) ? r.pick(GENERIC) : name());
-    return { id, hub, co: [...co], pop: (order.indexOf(id) + 1) ** -0.9 };
-  });
+  vocabulary ??= tagTopics(tumblrPosts());
+  const order = r.shuffle(vocabulary.map((_, i) => i));
+  const topics = vocabulary.map((t, id) => ({ ...t, id, pop: (order.indexOf(id) + 1) ** -0.9 }));
   const popular = topics[order[0]].id;
   const topicByPop = () => r.weighted(topics, (t) => t.pop);
 
@@ -79,13 +70,10 @@ function tagsFor(world, r, topic, isReblog, spam) {
   const tags = [];
   if (spam) {
     tags.push(...r.sample(world.topics, 2 + r.int(4)).map((t) => r.chance(0.6) ? t.hub : r.pick(t.co)));
-  } else if (!r.chance(0.1)) { // a tenth of posts carry no topic tags at all
-    if (r.chance(isReblog ? 0.5 : 0.75)) tags.push(topic.hub);
-    tags.push(...r.sample(topic.co, 1 + r.int(3)));
+  } else if (!r.chance(0.1)) {
+    tags.push(...r.pick(topic.sets));
   }
-  const noise = r.chance(0.35) ? r.sample(COMMENT, 1 + r.int(2)) : [];
-  if (r.chance(0.25)) noise.push(r.pick(META));
-  return r.chance(0.2) ? [...noise, ...tags] : [...tags, ...noise]; // authors usually, not always, put topic tags first
+  return tags;
 }
 
 // A For-you-like stream: 70% from followed blogs (by posting rate), 30% popularity-driven recommendations.

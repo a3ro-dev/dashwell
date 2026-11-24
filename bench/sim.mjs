@@ -60,9 +60,10 @@ export function runEngine(T, trace, label = '', engine = T.emptyProfile()) {
   const folded = trace.map(({ s, now, post, viewed }, idx) => {
     while (delayed.length && delayed[0].at <= idx) delayed.shift().apply(now);
     if (s !== lastS) ((session = T.newSession()), (session.rand = rand), (lastS = s));
+    const view = { ...post.view }; // independent feature cache for each policy and migration replay
     const t0 = performance.now();
-    T.observe(engine, post.view, now);
-    const d = T.decide(engine, session, post.view, [], now);
+    T.observe(engine, view, now);
+    const d = T.decide(engine, session, view, [], now);
     const dt = performance.now() - t0;
     ms += dt;
     times.push(dt);
@@ -71,12 +72,12 @@ export function runEngine(T, trace, label = '', engine = T.emptyProfile()) {
     const a = post.act;
     const read = [a.dwell && 'dwell', a.like && 'like', a.reblog && 'reblog'].filter(Boolean);
     if (viewed && (!fold || a.expand)) {
-      T.remember?.(engine, post.view.root);
+      T.remember?.(engine, view.root);
       const current = session;
       const kinds = [...(fold ? ['expand'] : []), ...(a.hide ? ['hide'] : a.skip ? ['skip'] : read)];
       delayed.push({ at: idx + 3, apply(delivered) {
-        for (const k of kinds) T.recordInteraction(engine, current, post.view, k, delivered);
-        T.learnImpression?.(engine, current, post.view, { engaged: !!((fold && !T.remember) || a.like || a.reblog), expanded: fold, dwell: a.dwell, skip: a.skip, hide: a.hide }, delivered);
+        for (const k of kinds) T.recordInteraction(engine, current, view, k, delivered);
+        T.learnImpression?.(engine, current, view, { engaged: !!((fold && !T.remember) || a.like || a.reblog), expanded: fold, dwell: a.dwell, skip: a.skip, hide: a.hide }, delivered);
       } });
     }
     return fold;
@@ -131,7 +132,7 @@ function evaluate(trace, folded, user) {
   const m = {
     lift: mean(shown.map((p) => p.u)) / mean(us),
     first20: mean(posts.slice(0,20).filter(p => shownSet.has(p)).map(p => p.u)),
-    consecutive: mean(folded.map((f,i) => Number(f && folded[i-1] && trace[i].s === trace[i-1].s))),
+    consecutive: mean(folded.map((f,i) => Number(i > 0 && f && folded[i-1] && trace[i].s === trace[i-1].s))),
     prec: share(shown, (p) => p.u > med),
     recall: share(posts.filter((p) => p.u >= q75), (p) => shownSet.has(p)),
     fold: foldedPosts.length / posts.length,
