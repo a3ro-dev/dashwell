@@ -350,15 +350,19 @@ test('23. the stored profile stays bounded for a heavy long-tail user', () => {
   assert.ok('b' in p.m.f, 'the bias is never evicted');
 });
 
-test('24. a post stuffed with tags that never go together is tag spam', () => {
+test('24. well-known tags from unrelated topics stuffed into one post are tag spam; new tags are not', () => {
   const p = T.emptyProfile();
   const s = T.newSession();
-  for (let i = 0; i < 60; i++) run(p, s, [post(['space', 'nebula'], `b${i % 9}`), post(['cats', 'kitten'], `c${i % 9}`)]);
-  const [spam] = run(p, T.newSession(), [post(['marvel', 'baking', 'chess', 'tarot', 'follow for follow'], 'spammer')]);
+  const topics = [['space', 'nebula'], ['cats', 'kitten'], ['marvel', 'mcu'], ['baking', 'bread'], ['chess', 'openings']];
+  for (let i = 0; i < 40; i++) run(p, s, topics.map((t, j) => post(t, `b${j}_${i % 9}`)));
+  const [spam] = run(p, T.newSession(), [post(['space', 'cats', 'marvel', 'baking', 'chess'], 'spammer')]);
   assert.equal(spam.action, 'collapse');
   assert.match(spam.reason, /tag-stuffed/);
   const [ok] = run(p, T.newSession(), [post(['space', 'nebula'], 'honest')]);
   assert.notEqual(ok.action, 'collapse');
+  // seen live on Tumblr: a coherent post whose tags are just new to us is not spam
+  const [fandom] = run(p, T.newSession(), [post(['visionquest', 'marvel', 'wandavision', 'wanda maximoff', 'vision marvel', 'tommy maximoff'], 'fan')]);
+  assert.doesNotMatch(fandom.reason, /tag-stuffed/);
 });
 
 test('25. "less like this" outlasts the session: the topic gets no slots for weeks, a pinned blog still passes', () => {

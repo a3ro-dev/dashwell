@@ -56,7 +56,8 @@
     HIDE_OFF: 1.5, // decayed hides at which a topic gets no slots, only strong matches
     PARTNER: 3, // co-occurrences that make two tags partners
     STUFFED: 4, // this many tags in one post that never appear together = tag spam
-    STUFFED_AFTER: 100, // posts seen before co-occurrence is known well enough to call that
+    STUFFED_AFTER: 100,
+    KNOWN_TAG: 8, // times a tag must have been seen before its lack of partners means anything // posts seen before co-occurrence is known well enough to call that
     TRUST: 0.3, // learned P(engage) of a blog above which a full topic never folds its posts
   };
   const PRIORS = [0.08, 0.25, 0.1]; // engaged, dwelled, skipped
@@ -287,10 +288,14 @@
 
   // Tags of a post that never appear together with any other tag of it. Real posts tag one subject
   // with related tags; a post of 4+ strangers is tag spam, whatever the topics are.
+  // Only well-known tags count: on real Tumblr most tag combinations are simply unseen yet, and unseen is
+  // not unrelated. Spam stuffs popular tags to reach many feeds, so it still shows up as known strangers.
   function loners(p, all) {
-    const tags = all.filter((t) => !p.tags[t]?.g); // generic tags pair with everything and tell nothing
+    const tags = all.filter((t) => !p.tags[t]?.g && (p.tags[t]?.n ?? 0) >= P.KNOWN_TAG); // generic tags pair with everything and tell nothing
     if (tags.length < P.STUFFED) return 0;
-    return tags.filter((t) => !tags.some((u) => u !== t && (p.pairs[t < u ? `${t}|${u}` : `${u}|${t}`] ?? 0) >= P.PARTNER)).length;
+    // partners: seen together in at least one other post (observe() already counted this one), or in the same topic cluster
+    const paired = (t, u) => (p.pairs[t < u ? `${t}|${u}` : `${u}|${t}`] ?? 0) >= 2 || clusterOf(p, t) === clusterOf(p, u);
+    return tags.filter((t) => !tags.some((u) => u !== t && paired(t, u))).length;
   }
 
   // What a post is about. `topic`: clusters that count as topics (a tag needs 2+ blogs using it or the
