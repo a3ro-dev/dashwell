@@ -31,13 +31,14 @@ const keyOf = (id) => (onFollowing() ? 'f:' : 'y:') + id;
 function readPost(article) {
   const id = article.closest('[data-id]')?.dataset.id;
   // Reblog trails link to earlier posts as /blog/postId; the last one that isn't this post is the root.
-  const root = [...article.querySelectorAll('a[href]')]
+  const links = [...article.querySelectorAll('[data-testid="reblog-trail"] a[rel="author"][href], [data-testid="reblog-header"] a[href], [data-testid="reblog-tree"] header a[href]')];
+  const root = links
     .map((a) => a.getAttribute('href').match(/^(?:https:\/\/www\.tumblr\.com)?\/[\w-]+\/(\d{6,})/)?.[1])
     .filter((x) => x && x !== id)
     .at(-1);
   const trail = [
     ...new Set(
-      [...article.querySelectorAll('a[href]')]
+      links
         .map((a) => a.getAttribute('href').match(/^(?:https:\/\/www\.tumblr\.com)?\/([\w-]+)\/\d{6,}/)?.[1])
         .filter(Boolean),
     ),
@@ -52,21 +53,43 @@ function readPost(article) {
   };
 }
 
-function save() {
-  dirty = true;
+// Replay pending profile mutations on the latest persisted profile under an origin-wide lock.
+let pending = [];
+let flushing = false;
+function mutate(fn) {
+  const result = fn(engine);
+  pending.push(fn);
+  return result;
 }
-setInterval(() => {
-  if (dirty) chrome.storage.local.set({ engine }), (dirty = false);
-}, 5000);
-addEventListener('visibilitychange', () => document.hidden && dirty && (chrome.storage.local.set({ engine }), (dirty = false)));
+async function flush() {
+  if (flushing || !pending.length) return;
+  flushing = true;
+  try {
+    await navigator.locks.request('dashwell-profile', async () => {
+      const { engine: stored } = await chrome.storage.local.get({ engine: null });
+      const next = stored ?? T.emptyProfile();
+      const batch = pending.slice();
+      for (const fn of batch) fn(next);
+      await chrome.storage.local.set({ engine: next });
+      pending.splice(0, batch.length);
+      for (const fn of pending) fn(next);
+      engine = next;
+    });
+  } finally {
+    flushing = false;
+  }
+}
+setInterval(flush, 5000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
 
 function learn(post, kind) {
   const k = `${post.id}:${kind}`;
   if (learned.has(k)) return;
   learned.add(k);
-  if (['like', 'reblog', 'comment', 'expand'].includes(kind)) engaged.add(post.id);
-  T.recordInteraction(engine, session, post, kind, Date.now());
-  save();
+  if (['like', 'reblog', 'comment'].includes(kind)) engaged.add(post.id);
+  const now = Date.now();
+  const before = structuredClone(session.engaged);
+  mutate(p => T.recordInteraction(p, p === engine ? session : { engaged: Object.assign(Object.create(null), structuredClone(before)) }, post, kind, now));
 }
 
 // One label per post the user actually saw (shown, or folded then expanded), the first time it
@@ -75,8 +98,10 @@ function impress(id, out) {
   if ((labeled.has(id) && !out.hide) || !posts.has(id)) return; // a later "less like this" still teaches
   labeled.add(id);
   const d = decisions.get(keyOf(id));
-  T.learnImpression?.(engine, session, posts.get(id), { engaged: engaged.has(id), expanded: !!d?.shown, ...out }, Date.now());
-  save();
+  const outcome = { engaged: engaged.has(id), expanded: !!d?.shown, ...out };
+  const now = Date.now();
+  const post = posts.get(id);
+  mutate(p => T.learnImpression(p, session, post, outcome, now));
 }
 
 function render(article, post, d) {
@@ -88,13 +113,15 @@ function render(article, post, d) {
   text.textContent = d.say ?? 'Hidden to keep your feed varied';
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.textContent = d.byUser ? 'Undo' : 'Show';
+  btn.textContent = d.undo ? 'Undo' : 'Show';
   btn.setAttribute('aria-label', `Show hidden post from @${post.blog ?? 'unknown'}`);
   btn.onclick = () => {
     d.shown = true;
     article.classList.remove('tn-collapsed');
     bar.remove();
-    learn(post, 'expand');
+    if (d.undo) { clearTimeout(d.undo); d.undo = null; }
+    expose(post);
+    resume(article, performance.now());
   };
   bar.append(text, btn);
   article.prepend(bar);
@@ -111,40 +138,77 @@ function queueSkip(post) {
   skipTimer = setTimeout(() => {
     if (skips.length < 4)
       for (const x of skips) {
+        if ((elapsed.get(x.id) ?? 0) >= FAST_SKIP_MS || [...visibleSince.values()].some(v => v.post.id === x.id)) continue;
         learn(x, 'skip');
         impress(x.id, { skip: true });
       }
     skips = [];
   }, 700);
 }
-const skipWatcher = new IntersectionObserver((entries) => {
+const inView = new Set();
+const elapsed = new Map();
+const exposed = new Set();
+function expose(post) {
+  if (exposed.has(post.id)) return;
+  exposed.add(post.id);
+  mutate(p => T.remember(p, post.root ?? post.id));
+}
+function resume(article, time) {
+  if (document.hidden || !inView.has(article) || article.classList.contains('tn-collapsed') || visibleSince.has(article)) return;
+  const post = posts.get(article.closest('[data-id]')?.dataset.id);
+  if (!post) return;
+  visibleSince.set(article, { time, post });
+  expose(post);
+}
+function pause(article, time, left) {
+  const active = visibleSince.get(article);
+  if (!active) return;
+  visibleSince.delete(article);
+  const { post } = active;
+  const ms = (elapsed.get(post.id) ?? 0) + Math.max(0, time - active.time);
+  elapsed.set(post.id, ms);
+  if (!left || ms <= 0) return;
+  if (ms < FAST_SKIP_MS && !engaged.has(post.id)) queueSkip(post);
+  else {
+    const dwell = ms >= DWELL_MS[0] && ms <= DWELL_MS[1];
+    if (dwell) learn(post, 'dwell');
+    impress(post.id, { dwell });
+  }
+}
+const skipWatcher = new IntersectionObserver(entries => {
   for (const e of entries) {
-    const id = e.target.closest('[data-id]')?.dataset.id;
-    if (!id) continue;
-    if (e.isIntersecting) visibleSince.set(id, e.time);
-    else if (visibleSince.has(id)) {
-      const ms = e.time - visibleSince.get(id);
-      visibleSince.delete(id);
-      const d = decisions.get(keyOf(id));
-      if (!d || (d.action === 'collapse' && !d.shown) || !posts.has(id)) continue;
-      if (ms < FAST_SKIP_MS && !d.shown) queueSkip(posts.get(id));
-      else {
-        const dwell = ms >= DWELL_MS[0] && ms <= DWELL_MS[1] && !document.hidden;
-        if (dwell) learn(posts.get(id), 'dwell');
-        impress(id, { dwell });
-      }
+    if (e.isIntersecting && e.intersectionRect.height > 0) {
+      inView.add(e.target);
+      resume(e.target, e.time);
+    } else {
+      inView.delete(e.target);
+      pause(e.target, e.time, !document.hidden);
     }
   }
-}, { threshold: 0.5 });
+}, { threshold: [0, 0.001] });
+document.addEventListener('visibilitychange', () => {
+  const time = performance.now();
+  for (const article of inView) document.hidden ? pause(article, time, false) : resume(article, time);
+});
 
 // "Less like this": fold the post now with an undo and cool its topics. From the H key or Tumblr's ••• menu.
 function hidePost(article, post) {
   if (!article || article.classList.contains('tn-collapsed')) return;
   const d = { action: 'collapse', byUser: true, say: "Hidden. You'll see less like this", reason: 'hidden by you' };
   decisions.set(keyOf(post.id), d);
+  pause(article, performance.now(), false);
+  // Defer the entire negative until the Undo window closes.
+  const commit = () => {
+    if (!d.undo) return;
+    d.undo = null;
+    learn(post, 'hide');
+    impress(post.id, { hide: true });
+    const button = article.querySelector('.tn-bar button');
+    if (button) button.textContent = 'Show';
+  };
+  d.undo = setTimeout(commit, 10000);
+  addEventListener('pagehide', () => { commit(); flush(); }, { once: true });
   render(article, post, d);
-  learn(post, 'hide');
-  impress(post.id, { hide: true });
   // a tall post folding above the fold would yank the feed up; keep the Undo line in view instead
   const top = article.getBoundingClientRect().top;
   if (top < 64) scrollBy(0, top - 64);
@@ -220,8 +284,6 @@ function hideAppNags() {
 // Mutes first (everywhere on the feed), then: Following stays chronological with only
 // flood control; For you gets the full engine.
 function decideHere(post, now) {
-  const muted = T.mutedBy(mutes, post);
-  if (muted) return { action: 'collapse', reason: `muted: ${muted}`, say: `Muted: ${muted}` };
   if (onFollowing()) {
     const n = followWindow.filter((b) => b === post.blog).length;
     if (n >= 3 && !pinned.includes(post.blog)) return { action: 'collapse', reason: `flood: @${post.blog}`, say: `@${post.blog} has posted a lot in a row` };
@@ -229,7 +291,11 @@ function decideHere(post, now) {
     if (followWindow.length > 16) followWindow.shift();
     return { action: 'show', reason: 'following: chronological' };
   }
-  return T.decide(engine, session, post, pinned, now);
+  const state = { ...session, window: session.window.slice() };
+  const pins = pinned.slice();
+  const sample = Math.random();
+  session.rand = () => sample;
+  return mutate(p => T.decide(p, p === engine ? session : { ...state, rand: () => sample, window: state.window.slice() }, post, pins, now));
 }
 
 // Every Tumblr page is titled just "Tumblr", which collapses browser history. Name them.
@@ -257,12 +323,15 @@ function scan() {
       const key = keyOf(post.id);
       if (!decisions.has(key)) {
         const now = Date.now();
-        if (!posts.has(post.id)) T.observe(engine, post, now);
+        if (!posts.has(post.id)) mutate(p => T.observe(p, post, now));
         decisions.set(key, decideHere(post, now));
         posts.set(post.id, post);
-        save();
+
       }
-      render(article, post, decisions.get(key));
+      const base = decisions.get(key);
+      const mute = T.mutedBy(mutes, post);
+      if (base.mute !== mute) { base.mute = mute; base.muteDecision = { action: 'collapse', say: 'Muted: ' + mute }; }
+      render(article, post, mute && !base.byUser ? base.muteDecision : base);
       skipWatcher.observe(article);
     }
   }
@@ -410,7 +479,14 @@ chrome.storage.onChanged.addListener((changes) => {
     settings = { ...DEFAULTS, ...changes.settings.newValue };
     applySettings();
   }
-  if (changes.engine && !changes.engine.newValue) engine = T.emptyProfile(); // reset from settings
+  if (changes.settings || changes.mutes || changes.pinned) {
+    for (const article of document.querySelectorAll(ARTICLE)) {
+      article.querySelector('.tn-bar')?.remove();
+      article.classList.remove('tn-collapsed');
+      delete article.dataset.tn;
+    }
+  }
+  if (changes.engine && !changes.engine.newValue) { pending = []; engine = T.emptyProfile(); } // reset from settings
   if (changes.unread) (unreadCount = changes.unread.newValue?.length ?? 0), updateAppButton();
   scan();
 });

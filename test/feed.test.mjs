@@ -13,7 +13,9 @@ const post = (tags, blog = `blog${n}`, extra = {}) => ({ id: `p${n++}`, tags, bl
 function run(p, s, posts, pinned = [], t = now) {
   return posts.map((x) => {
     T.observe(p, x, t);
-    return T.decide(p, s, x, pinned, t);
+    const d = T.decide(p, s, x, pinned, t);
+    if (d.action !== 'collapse') T.remember(p, x.root ?? x.id);
+    return d;
   });
 }
 const shownCount = (ds) => ds.filter((d) => d.action !== 'collapse').length;
@@ -235,6 +237,7 @@ function session(p, posts, react, t, pinned = []) {
     const at = t + i * 1e4;
     T.observe(p, x, at);
     const d = T.decide(p, s, x, pinned, at);
+    if (d.action !== 'collapse') T.remember(p, x.root ?? x.id);
     if (d.action !== 'collapse') T.learnImpression(p, s, x, react(x), at);
     return d;
   });
@@ -395,4 +398,14 @@ test('26. a value-folded topic gets a rare second chance, but not one you asked 
   for (let i = 0; i < 3; i++) T.recordInteraction(p, T.newSession(), post(['hazbin hotel']), 'hide', now + 26 * DAY);
   const after = session(p, [26, 27, 28, 29, 30].flatMap(mix), react, now + 26 * DAY).filter((_, i) => i % 3 === 0);
   assert.equal(after.filter((d) => d.reason.startsWith('second chance')).length, 0);
+});
+
+test('preloading does not mark a root seen and JSON profiles accept inherited names', () => {
+  const p = JSON.parse(JSON.stringify(T.emptyProfile()));
+  const x = post(['constructor'], 'constructor');
+  T.observe(p, x, now);
+  T.decide(p, T.newSession(), x, [], now);
+  assert.deepEqual(p.rr, []);
+  assert.equal(p.tags.constructor.n, 1);
+  assert.equal(p.blogs.constructor.seen, 1);
 });

@@ -93,10 +93,11 @@
   // Value model state. f: feature -> [zE, nE, zD, nD, zN, nN, updates, last-seen day] (FTRL z and n per head).
   // The bias starts at the prior rate of each head. th/hi: tracked fold and rescue thresholds on V.
   // cv: topic -> [average V of its recent posts, how many]. k: labeled impressions so far. q: the first V values, until the thresholds can be seeded from them.
+  const dict = () => Object.create(null);
   const biasRec = () => [...PRIORS.flatMap((pr) => [-logit(pr) * (P.BETA / P.ALPHA + P.L2), 0]), 0, 0];
   const emptyModel = () => ({ f: { b: biasRec() }, cv: {}, th: 0, hi: 0, k: 0, q: [] });
   const emptyProfile = () => ({ n: 0, boost: {}, tags: {}, pairs: {}, map: {}, blogs: {}, debt: {}, imp: {}, m: emptyModel(), rr: [] });
-  const newSession = () => ({ window: [], shown: 0, lastExplore: 0, roots: new Set(), engaged: {} });
+  const newSession = () => ({ window: [], shown: 0, lastExplore: 0, roots: new Set(), engaged: dict() });
 
   // Profiles written by v1 have no model and no root memory; both start empty.
   function ensure(p) {
@@ -105,6 +106,12 @@
     p.m.f.b ??= biasRec();
     p.m.cv ??= {};
     p.rr ??= [];
+    for (const key of ['tags', 'blogs', 'pairs', 'map', 'debt', 'imp', 'hid', 'boost']) {
+      p[key] ??= dict();
+      if (Object.getPrototypeOf(p[key])) Object.setPrototypeOf(p[key], null);
+    }
+    Object.setPrototypeOf(p.m.cv, null);
+    Object.setPrototypeOf(p.m.f, null);
     return p.m;
   }
 
@@ -116,6 +123,7 @@
     return s;
   }
   function remember(p, root) {
+    ensure(p);
     const s = rootSet(p);
     if (s.has(root)) return;
     s.add(root);
@@ -142,7 +150,8 @@
 
   // Long-term interest per cluster = log1p(sum of member tag weights). Generic tags carry none.
   function clusterScores(p, now) {
-    const sums = {};
+    ensure(p);
+    const sums = dict();
     for (const [tag, s] of Object.entries(p.tags)) {
       if (s.g) continue;
       const w = tagWeight(s, now);
@@ -240,7 +249,7 @@
   // A tag whose co-tags are scattered over many unrelated topics (#iconic, #art) says nothing about
   // the post's topic, like commentary. Real topic tags keep most of their co-occurrences in a few partners.
   function markGeneric(p) {
-    const partners = {};
+    const partners = dict();
     for (const [k, c] of Object.entries(p.pairs)) {
       const [a, b] = k.split('|');
       (partners[a] ??= []).push(c);
@@ -257,9 +266,10 @@
 
   // NPMI graph + 3 rounds of label propagation; each cluster is named after its most frequent tag.
   function recluster(p) {
+    ensure(p);
     prune(p);
     markGeneric(p);
-    const adj = {};
+    const adj = dict();
     for (const [k, c] of Object.entries(p.pairs)) {
       if (c < P.MIN_COOC) continue;
       const [a, b] = k.split('|');
@@ -272,17 +282,18 @@
       (adj[a] ??= []).push([b, npmi]);
       (adj[b] ??= []).push([a, npmi]);
     }
-    const label = {};
+    const label = dict();
     for (const t in adj) label[t] = t;
     for (let iter = 0; iter < 3; iter++)
       for (const t in adj) {
-        const tally = { [label[t]]: 0.5 * Math.max(...adj[t].map(([, w]) => w)) };
+        const tally = dict();
+        tally[label[t]] = 0.5 * Math.max(...adj[t].map(([, w]) => w));
         for (const [nb, w] of adj[t]) tally[label[nb]] = (tally[label[nb]] ?? 0) + w;
         label[t] = Object.keys(tally).reduce((x, y) => (tally[y] > tally[x] ? y : x));
       }
-    const hub = {};
+    const hub = dict();
     for (const [t, l] of Object.entries(label)) if (!hub[l] || p.tags[t].n > p.tags[hub[l]].n) hub[l] = t;
-    p.map = {};
+    p.map = dict();
     for (const [t, l] of Object.entries(label)) if (hub[l] !== t) p.map[t] = hub[l];
   }
 
@@ -321,7 +332,7 @@
   // a quiet friend you always like beats a firehose you sometimes like.
   function tieStrength(p, blog, pinned, now) {
     const pin = pinned.includes(blog) ? 10 : 0;
-    const b = p.blogs[blog];
+    const b = Object.hasOwn(p.blogs, blog) && p.blogs[blog];
     if (!b) return pin;
     const w = b.w * half(now - b.t, P.BLOG_HL_DAYS * DAY);
     // posts you were shown, not posts the engine folded: folding a blog must not lower its engagement rate
@@ -332,6 +343,7 @@
 
   function recordInteraction(p, session, post, kind, now) {
     ensure(p);
+    if (kind === 'expand') return;
     const tags = cleanTags(post.tags).filter((t) => !p.tags[t]?.g);
     // negatives count once per topic, not once per tag: a 6-tag post is one skip, not six
     if (kind === 'skip' || kind === 'hide') {
@@ -525,8 +537,7 @@
     const win = session.window;
     const authorCount = win.filter((x) => x.blog === post.blog).length;
     const root = post.root ?? post.id;
-    const dup = session.roots.has(root) || rootSet(p).has(root);
-    session.roots.add(root);
+    const dup = rootSet(p).has(root);
     const tie = post.blog ? tieStrength(p, post.blog, pinned, now) : 0;
     const an = analyze(p, post, now);
     const clusters = an.topic.slice(0, P.TOP_CLUSTERS);
@@ -536,7 +547,6 @@
       win.push({ blog: post.blog, clusters: consumes ? clusters : [] });
       if (win.length > P.W) win.shift();
       session.shown++;
-      remember(p, root);
       for (const c of clusters) {
         p.imp[c] = (p.imp[c] ?? 0) + 1;
         if (consumes) addDebt(p, c, 0.25, now);
@@ -669,7 +679,7 @@
   }
 
   globalThis.TumblrNew = {
-    parseMutes, mutedBy,
+    parseMutes, mutedBy, remember,
     P, emptyProfile, newSession, cleanTags, observe, recluster, decide, recordInteraction, learnImpression,
     tieStrength, favorites, topInterests, quotaFn, clustersOf,
   };
