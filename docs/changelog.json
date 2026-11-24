@@ -9,7 +9,8 @@
       "Mute and feed settings update mounted posts. Saves combine learning from multiple dashboard tabs.",
       "Repeated promotions with unrelated, familiar tags can fold. One unusual tag combination alone can pass.",
       "Settings show how often you open folds, press Like or Reblog, or hide posts, including where the older topic rules would have chosen differently. The comparison stays on your device. Android needs the next APK to display these figures.",
-      "In a five-seed simulator, spam made up 4.1% of shown posts, compared with 5.3% without an engine. The new rules showed more high-utility posts and fewer adjacent fold bars than 1.3.0."
+      "In a five-seed simulator, spam made up 3.1% of shown posts, compared with 5.0% without an engine. The new rules showed more high-utility posts and fewer adjacent fold bars than 1.3.0.",
+      "We also replayed real people's feeds (KuaiRand: 27,000 users of a short-video app, scored on users we never tuned on). There, no Dashwell version picked what people would like much better than chance: the engine's real value is less spam, fewer repeats and the controls you use yourself, not mind-reading. 1.3.1 folds the least of the three. The numbers in Settings now show how it does on your own feed."
     ]
   },
   {
