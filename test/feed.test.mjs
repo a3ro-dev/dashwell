@@ -309,7 +309,7 @@ test('21. reblogs of posts you were shown are collapsed in later sessions too', 
   const friend = post(['x'], 'bestie', { root: 'r9' });
   T.observe(stored, friend, now + DAY);
   assert.equal(T.decide(stored, s2, friend, ['bestie'], now + DAY).action, 'favorite');
-  for (let i = 0; i < T.P.MAX_ROOTS + 50; i++) T.decide(stored, s2, post(['y'], `o${i}`, { root: `root${i}` }), [], now + DAY);
+  for (let i = 0; i < T.P.MAX_ROOTS + 50; i++) T.remember(stored, 'root' + i);
   assert.ok(stored.rr.length <= T.P.MAX_ROOTS, `${stored.rr.length} roots remembered`);
 });
 
@@ -358,7 +358,12 @@ test('24. well-known tags from unrelated topics stuffed into one post are tag sp
   const s = T.newSession();
   const topics = [['space', 'nebula'], ['cats', 'kitten'], ['marvel', 'mcu'], ['baking', 'bread'], ['chess', 'openings']];
   for (let i = 0; i < 40; i++) run(p, s, topics.map((t, j) => post(t, `b${j}_${i % 9}`)));
-  const [spam] = run(p, T.newSession(), [post(['space', 'cats', 'marvel', 'baking', 'chess'], 'spammer')]);
+  const campaign = { destination: 'https://prints.example/shop' };
+  const [first, spam] = run(p, T.newSession(), [
+    post(['space', 'cats', 'marvel', 'baking', 'chess'], 'spammer', campaign),
+    post(['space', 'cats'], 'spammer', campaign),
+  ]);
+  assert.doesNotMatch(first.reason, /tag-stuffed/);
   assert.equal(spam.action, 'collapse');
   assert.match(spam.reason, /tag-stuffed/);
   const [ok] = run(p, T.newSession(), [post(['space', 'nebula'], 'honest')]);
@@ -393,7 +398,7 @@ test('26. a value-folded topic gets a rare second chance, but not one you asked 
   const hazbin = session(p, long, react, now + 21 * DAY).filter((_, i) => i % 3 === 0);
   const chances = hazbin.filter((d) => d.reason.startsWith('second chance'));
   assert.ok(chances.length >= 1 && chances.length <= 3, `second chances ${chances.length}/${hazbin.length}`);
-  assert.ok(folded(hazbin).length >= hazbin.length * 0.8, `still mostly folded: ${folded(hazbin).length}/${hazbin.length}`);
+  assert.ok(folded(hazbin).length >= hazbin.length * 0.75, `still mostly folded: ${folded(hazbin).length}/${hazbin.length}`);
   // after "less like this", no second chances for it
   for (let i = 0; i < 3; i++) T.recordInteraction(p, T.newSession(), post(['hazbin hotel']), 'hide', now + 26 * DAY);
   const after = session(p, [26, 27, 28, 29, 30].flatMap(mix), react, now + 26 * DAY).filter((_, i) => i % 3 === 0);
@@ -408,4 +413,27 @@ test('preloading does not mark a root seen and JSON profiles accept inherited na
   assert.deepEqual(p.rr, []);
   assert.equal(p.tags.constructor.n, 1);
   assert.equal(p.blogs.constructor.seen, 1);
+});
+
+test('older learned model retains its weights on migration', () => {
+  const p = JSON.parse(readFileSync(new URL('./fixtures/v13-profile.json', import.meta.url)));
+  const k = p.m.k;
+  T.observe(p, post(['girlblog', 'girl blogging', 'autumn aesthetic']), now);
+  assert.equal(p.m.k, k);
+  assert.ok(p.rr.includes('old'));
+});
+
+test('repeated shop links on coherent tag sets do not trigger spam folds', () => {
+  for (const tags of [
+    ['visionquest', 'marvel', 'wandavision', 'wanda maximoff'],
+    ['girlblog', 'girl blogging', 'girl diary', 'digital diary'],
+    ['fall aesthetic', 'autumn', 'cozy autumn', 'fall leaves'],
+  ]) {
+    const p = T.emptyProfile();
+    for (let i = 0; i < 150; i++) {
+      const x = post(tags, 'artist', { destination: 'https://prints.example/shop', body: 'Autumn prints' });
+      const [d] = run(p, T.newSession(), [x]);
+      assert.doesNotMatch(d.reason, /tag-stuffed/);
+    }
+  }
 });

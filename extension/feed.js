@@ -44,7 +44,7 @@
     VALUE_AFTER: 80, // more labeled impressions after WARM before value folds start (quota and rescue use the model first)
     COLD_SHARE: 3, // before warm, a topic folds only once it takes more than 1/COLD_SHARE of the window
     WARM: 80, // labeled impressions before value folds start; before that the quota is relaxed
-    Q_FOLD: 0.2, Q_HI: 0.7, ETA: 0.02, // tracked quantiles of V: fold below the first, rescue above the second
+    Q_FOLD: 0.13, Q_HI: 0.55, ETA: 0.02, // tracked quantiles of V: fold below the first, rescue above the second
     CV_MIN: 4, // posts of a topic scored before its average value counts
     CV_WINDOW: 15, // and the average follows roughly this many recent posts
     MAX_TOPICS: 400,
@@ -303,10 +303,29 @@
   // not unrelated. Spam stuffs popular tags to reach many feeds, so it still shows up as known strangers.
   function loners(p, all) {
     const tags = all.filter((t) => !p.tags[t]?.g && (p.tags[t]?.n ?? 0) >= P.KNOWN_TAG); // generic tags pair with everything and tell nothing
-    if (tags.length < P.STUFFED) return 0;
+    if (tags.length < 2) return 0;
     // partners: seen together in at least one other post (observe() already counted this one), or in the same topic cluster
     const paired = (t, u) => (p.pairs[t < u ? `${t}|${u}` : `${u}|${t}`] ?? 0) >= 2 || clusterOf(p, t) === clusterOf(p, u);
     return tags.filter((t) => !tags.some((u) => u !== t && paired(t, u))).length;
+  }
+
+  function repeatedPromotion(p, post, unrelated) {
+    const body = (post.body ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!post.destination && !/\b(shop|buy|sale|order|promo)\b/.test(body)) return false;
+    const key = [post.blog, post.destination?.slice(0, 100), body.slice(0, 100)].join("|");
+    if (!post.destination && body.length < 16) return false;
+    const root = post.root ?? post.id;
+    const campaigns = p.campaigns ??= [];
+    const match = campaigns.find(entry => entry[0] === key);
+    if (match && match[1] !== root && (match[2] || unrelated >= 2)) {
+      match[2] = true;
+      return true;
+    }
+    if (!match) {
+      campaigns.push([key, root, unrelated >= 2]);
+      if (campaigns.length > 128) campaigns.shift();
+    }
+    return false;
   }
 
   // What a post is about. `topic`: clusters that count as topics (a tag needs 2+ blogs using it or the
@@ -567,8 +586,8 @@
       return { action: 'collapse', reason: `collapsed: @${post.blog} used ${authorCount}/${P.AUTHOR_CAP} recent author slots`, say: `More from @${post.blog} than everyone else lately`, tag: post.blog, clusters: [] };
 
     // value: what the model expects you to do with this post
-    if (an.loners >= P.STUFFED && p.n >= P.STUFFED_AFTER)
-      return { action: 'collapse', reason: `collapsed: tag-stuffed (${an.loners} tags that never appear together)`, say: 'Looks like tag spam', clusters: [] };
+    if (repeatedPromotion(p, post, an.loners))
+      return { action: 'collapse', reason: `collapsed: tag-stuffed (${an.loners} tags that never appear together)`, say: 'Repeated promotion across unrelated tags', clusters: [] };
     const fv = featuresOf(p, post, an);
     FEATS.set(post, fv);
     const sc = score(m, fv, session.rand ?? Math.random);
@@ -603,7 +622,7 @@
     const qf = quotaFn(p, now, an.scores);
     // before the model knows you, a topic only folds once it dominates what you've been shown
     const floor = warm ? 0 : Math.ceil((win.length / P.COLD_SHARE) * Math.max(0, 1 - m.k / P.WARM));
-    const quota = (c) => Math.max(qf(c), floor);
+    const quota = (c) => qf(c) === 0 ? 0 : Math.max(qf(c) + Number(warm), floor);
     const used = (c) => win.filter((x) => x.clusters.includes(c)).length;
     // xQuAD-style rescue: collapse only if ALL of the post's topics are full. Before the model knows
     // you, only the strongest topic of a multi-topic post can open a slot, so one open topic can't carry a spam post.
@@ -638,6 +657,58 @@
       tag: crowded,
       clusters,
     };
+  }
+
+  // Apply the 1.2-style gates to today's profile with a separate chronological window.
+  function shadowFold(p, s, post, pinned, now) {
+    const root = post.root ?? post.id;
+    const duplicate = s.roots.has(root);
+    s.roots.add(root);
+    const author = s.window.filter(x => x.blog === post.blog).length;
+    const friend = tieStrength(p, post.blog, pinned, now) >= 1.8 && author < 3;
+    if (!friend && (duplicate || author >= 2)) return true;
+    const clusters = clustersOf(p, post, now);
+    const quota = quotaFn(p, now);
+    const full = clusters.length && clusters.every(c => s.window.filter(x => x.clusters.includes(c)).length >= quota(c));
+    if (!friend && full) {
+      if (s.shown - s.lastExplore < P.EXPLORE_EVERY - 1 || !clusters.some(c => (p.imp[c] ?? 0) < P.NOVEL_IMPRESSIONS)) return true;
+      s.lastExplore = s.shown + 1;
+    }
+    s.window.push({ blog: post.blog, clusters: friend ? [] : clusters });
+    if (s.window.length > P.W) s.window.shift();
+    s.shown++;
+    return false;
+  }
+
+  const event = { shadow: 1, fold: 2, visible: 4, open: 8, like: 16, reblog: 32, hide: 64, read: 128, dwell: 256, skip: 512 };
+
+  function audit(p, key, flags, create = false) {
+    const rows = p.audit ??= [];
+    const row = rows.findLast(x => x[0] === key);
+    if (row) {
+      // Snapshot the actual render on first exposure, after any preload-time settings changes.
+      if ((flags & 4) && !(row[1] & 4)) row[1] = (row[1] & ~2) | (flags & 2);
+      row[1] |= flags & ~2;
+    }
+    else if (create) {
+      rows.push([key, flags]);
+      if (rows.length > 512) rows.shift();
+    }
+  }
+  function deviceStats(p) {
+    const rows = (p.audit ?? []).map(x => x[1]).filter(x => x & event.visible);
+    const counts = xs => {
+      const folds = xs.filter(x => x & event.fold);
+      const shown = xs.filter(x => x & event.read);
+      const count = flag => shown.filter(x => x & flag).length;
+      const rate = (n, d) => d ? n + '/' + d + ' (' + Math.round(100 * n / d) + '%)' : '0/0';
+      return rate(folds.filter(x => x & event.open).length, folds.length) + ' folds opened, ' +
+        rate(count(event.like) + count(event.reblog), shown.length) + ' Like/Reblog presses per shown post, ' +
+        rate(count(event.hide), shown.length) + ' hides per shown post, ' + count(event.dwell) + ' reads of 4-60s and ' + count(event.skip) + ' quick skips';
+    };
+    return 'Recent visible For you posts: ' + counts(rows) +
+      '. Only Dashwell folded: ' + counts(rows.filter(x => (x & 3) === 2)) +
+      '. Only the older rules would fold: ' + counts(rows.filter(x => (x & 3) === 1)) + '.';
   }
 
   function favorites(p, pinned, now, limit = 25) {
@@ -679,7 +750,7 @@
   }
 
   globalThis.TumblrNew = {
-    parseMutes, mutedBy, remember,
+    parseMutes, mutedBy, remember, shadowFold, audit, deviceStats, event,
     P, emptyProfile, newSession, cleanTags, observe, recluster, decide, recordInteraction, learnImpression,
     tieStrength, favorites, topInterests, quotaFn, clustersOf,
   };

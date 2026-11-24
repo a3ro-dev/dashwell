@@ -70,6 +70,7 @@ async function draw() {
   $('interests').textContent = top.length
     ? `Lately you've been into ${top.length > 1 ? `${top.slice(0, -1).join(', ')} and ${top.at(-1)}` : top[0]}.`
     : 'Like or reblog a few posts and Dashwell learns what you enjoy.';
+  if (T.deviceStats) $('interests').append(el('p', T.deviceStats(engine)));
 }
 
 for (const key in DEFAULTS) {

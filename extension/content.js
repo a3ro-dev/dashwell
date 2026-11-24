@@ -19,7 +19,13 @@ let pinned = [];
 let settings = DEFAULTS;
 let mutes = [];
 const followWindow = []; // blogs of recently shown posts on the chronological Following tab
-let dirty = false;
+const shadow = T.newSession();
+const audits = new Map();
+const tabKey = crypto.randomUUID().slice(0, 12);
+function outcome(id, flags) {
+  const key = onFeed() && !onFollowing() && audits.get(id);
+  if (key) mutate(p => T.audit(p, key, flags));
+}
 
 // The logged-in home is "/" or "/dashboard..."; tag and blog pages are skipped because
 // every post there shares a topic or an author and would all collapse.
@@ -30,12 +36,12 @@ const keyOf = (id) => (onFollowing() ? 'f:' : 'y:') + id;
 
 function readPost(article) {
   const id = article.closest('[data-id]')?.dataset.id;
-  // Reblog trails link to earlier posts as /blog/postId; the last one that isn't this post is the root.
+  // Reblog trails link to earlier posts as /blog/postId; trail items run from the original author to later reblogs.
   const links = [...article.querySelectorAll('[data-testid="reblog-trail"] a[rel="author"][href], [data-testid="reblog-header"] a[href], [data-testid="reblog-tree"] header a[href]')];
   const root = links
     .map((a) => a.getAttribute('href').match(/^(?:https:\/\/www\.tumblr\.com)?\/[\w-]+\/(\d{6,})/)?.[1])
     .filter((x) => x && x !== id)
-    .at(-1);
+    .at(0);
   const trail = [
     ...new Set(
       links
@@ -43,7 +49,12 @@ function readPost(article) {
         .filter(Boolean),
     ),
   ];
+  const body = article.querySelector('[data-testid="post-content"], [data-testid="post-body"], .npf_row, p');
+  const destination = [...(body?.querySelectorAll('a[href]') ?? [])].find(a =>
+    /^https?:$/.test(a.protocol) && a.hostname !== location.hostname);
   return {
+    body: body?.textContent.slice(0, 600),
+    destination: destination && destination.origin + destination.pathname,
     id,
     trail,
     text: article.textContent.slice(0, 4000),
@@ -86,9 +97,14 @@ function learn(post, kind) {
   const k = `${post.id}:${kind}`;
   if (learned.has(k)) return;
   learned.add(k);
+  if (Object.hasOwn(T.event, kind)) outcome(post.id, T.event[kind]);
   if (['like', 'reblog', 'comment'].includes(kind)) engaged.add(post.id);
   const now = Date.now();
-  const before = structuredClone(session.engaged);
+  const before = Object.create(null);
+  for (const tag of T.cleanTags(post.tags)) {
+    const topic = Object.hasOwn(engine.map, tag) ? engine.map[tag] : tag;
+    if (session.engaged[topic]) before[topic] = new Set(session.engaged[topic]);
+  }
   mutate(p => T.recordInteraction(p, p === engine ? session : { engaged: Object.assign(Object.create(null), structuredClone(before)) }, post, kind, now));
 }
 
@@ -98,7 +114,7 @@ function impress(id, out) {
   if ((labeled.has(id) && !out.hide) || !posts.has(id)) return; // a later "less like this" still teaches
   labeled.add(id);
   const d = decisions.get(keyOf(id));
-  const outcome = { engaged: engaged.has(id), expanded: !!d?.shown, ...out };
+  const outcome = { engaged: engaged.has(id), expanded: !!((!d?.byUser && d?.shown) || d?.muteDecision?.shown), ...out };
   const now = Date.now();
   const post = posts.get(id);
   mutate(p => T.learnImpression(p, session, post, outcome, now));
@@ -114,12 +130,19 @@ function render(article, post, d) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = d.undo ? 'Undo' : 'Show';
-  btn.setAttribute('aria-label', `Show hidden post from @${post.blog ?? 'unknown'}`);
+  btn.setAttribute('aria-label', d.undo ? 'Undo less like this' : `Show hidden post from @${post.blog ?? 'unknown'}`);
   btn.onclick = () => {
     d.shown = true;
     article.classList.remove('tn-collapsed');
     bar.remove();
-    if (d.undo) { clearTimeout(d.undo); d.undo = null; }
+    if (!d.byUser) outcome(post.id, T.event.open | T.event.read);
+    if (d.undo) {
+      clearTimeout(d.undo);
+      pendingHides.delete(d.commit);
+      d.undo = null;
+      decisions.set(d.key, d.previous);
+      delete d.commit;
+    }
     expose(post);
     resume(article, performance.now());
   };
@@ -138,7 +161,7 @@ function queueSkip(post) {
   skipTimer = setTimeout(() => {
     if (skips.length < 4)
       for (const x of skips) {
-        if ((elapsed.get(x.id) ?? 0) >= FAST_SKIP_MS || [...visibleSince.values()].some(v => v.post.id === x.id)) continue;
+        if (engaged.has(x.id) || decisions.get(keyOf(x.id))?.byUser || (elapsed.get(x.id) ?? 0) >= FAST_SKIP_MS || [...visibleSince.values()].some(v => v.post.id === x.id)) continue;
         learn(x, 'skip');
         impress(x.id, { skip: true });
       }
@@ -148,6 +171,15 @@ function queueSkip(post) {
 const inView = new Set();
 const elapsed = new Map();
 const exposed = new Set();
+const pendingHides = new Set();
+addEventListener("pagehide", () => { for (const commit of pendingHides) commit(); flush(); });
+const audited = new Set();
+function visibleAudit(article) {
+  const id = article.closest('[data-id]')?.dataset.id;
+  if (!audits.has(id) || onFollowing() || audited.has(id)) return;
+  audited.add(id);
+  outcome(id, 4 | (article.classList.contains('tn-collapsed') ? 2 : 0));
+}
 function expose(post) {
   if (exposed.has(post.id)) return;
   exposed.add(post.id);
@@ -157,6 +189,7 @@ function resume(article, time) {
   if (document.hidden || !inView.has(article) || article.classList.contains('tn-collapsed') || visibleSince.has(article)) return;
   const post = posts.get(article.closest('[data-id]')?.dataset.id);
   if (!post) return;
+  outcome(post.id, T.event.read);
   visibleSince.set(article, { time, post });
   expose(post);
 }
@@ -179,6 +212,7 @@ const skipWatcher = new IntersectionObserver(entries => {
   for (const e of entries) {
     if (e.isIntersecting && e.intersectionRect.height > 0) {
       inView.add(e.target);
+      if (!document.hidden) visibleAudit(e.target);
       resume(e.target, e.time);
     } else {
       inView.delete(e.target);
@@ -188,26 +222,43 @@ const skipWatcher = new IntersectionObserver(entries => {
 }, { threshold: [0, 0.001] });
 document.addEventListener('visibilitychange', () => {
   const time = performance.now();
-  for (const article of inView) document.hidden ? pause(article, time, false) : resume(article, time);
+  for (const article of inView) {
+    if (document.hidden) pause(article, time, false);
+    else { visibleAudit(article); resume(article, time); }
+  }
 });
 
 // "Less like this": fold the post now with an undo and cool its topics. From the H key or Tumblr's ••• menu.
 function hidePost(article, post) {
   if (!article || article.classList.contains('tn-collapsed')) return;
-  const d = { action: 'collapse', byUser: true, say: "Hidden. You'll see less like this", reason: 'hidden by you' };
-  decisions.set(keyOf(post.id), d);
+  const d = { action: 'collapse', byUser: true, say: 'Hidden. Undo within 10 seconds', reason: 'hidden by you' };
+  d.key = keyOf(post.id);
+  d.previous = decisions.get(d.key) ?? { action: 'show' };
+  decisions.set(d.key, d);
   pause(article, performance.now(), false);
   // Defer the entire negative until the Undo window closes.
   const commit = () => {
     if (!d.undo) return;
+    pendingHides.delete(commit);
+    delete d.commit;
+    delete d.previous;
     d.undo = null;
     learn(post, 'hide');
     impress(post.id, { hide: true });
-    const button = article.querySelector('.tn-bar button');
-    if (button) button.textContent = 'Show';
+    d.say = "Hidden. You'll see less like this";
+    for (const mounted of document.querySelectorAll(ARTICLE)) {
+      if (mounted.closest('[data-id]')?.dataset.id !== post.id) continue;
+      const bar = mounted.querySelector('.tn-bar');
+      if (!bar) continue;
+      bar.querySelector('p').textContent = d.say;
+      const button = bar.querySelector('button');
+      button.textContent = 'Show';
+      button.setAttribute('aria-label', 'Show hidden post');
+    }
   };
   d.undo = setTimeout(commit, 10000);
-  addEventListener('pagehide', () => { commit(); flush(); }, { once: true });
+  d.commit = commit;
+  pendingHides.add(commit);
   render(article, post, d);
   // a tall post folding above the fold would yank the feed up; keep the Undo line in view instead
   const top = article.getBoundingClientRect().top;
@@ -286,16 +337,22 @@ function hideAppNags() {
 function decideHere(post, now) {
   if (onFollowing()) {
     const n = followWindow.filter((b) => b === post.blog).length;
-    if (n >= 3 && !pinned.includes(post.blog)) return { action: 'collapse', reason: `flood: @${post.blog}`, say: `@${post.blog} has posted a lot in a row` };
+    if (n >= 3 && !pinned.includes(post.blog)) return { recent: n, action: 'collapse', reason: `flood: @${post.blog}`, say: `@${post.blog} has posted a lot in a row` };
     followWindow.push(post.blog);
     if (followWindow.length > 16) followWindow.shift();
-    return { action: 'show', reason: 'following: chronological' };
+    return { recent: n, action: 'show', reason: 'following: chronological' };
   }
   const state = { ...session, window: session.window.slice() };
   const pins = pinned.slice();
   const sample = Math.random();
-  session.rand = () => sample;
-  return mutate(p => T.decide(p, p === engine ? session : { ...state, rand: () => sample, window: state.window.slice() }, post, pins, now));
+  function randomStream() {
+    let state = Math.floor(sample * 4294967296);
+    return () => ((state = (Math.imul(1664525, state) + 1013904223) >>> 0) / 4294967296);
+  }
+  session.rand = randomStream();
+  const result = mutate(p => T.decide(p, p === engine ? session : { ...state, rand: randomStream(), window: state.window.slice() }, post, pins, now));
+  result.before = state;
+  return result;
 }
 
 // Every Tumblr page is titled just "Tumblr", which collapses browser history. Name them.
@@ -314,6 +371,12 @@ function retitle() {
 
 function scan() {
   retitle();
+  for (const article of inView) {
+    if (article.isConnected !== false) continue;
+    inView.delete(article);
+    pause(article, performance.now(), !document.hidden);
+    skipWatcher.unobserve(article);
+  }
   for (const cell of document.querySelectorAll(SPONSORED)) ads.add(cell);
   if (onFeed()) {
     for (const article of document.querySelectorAll(`${ARTICLE}:not([data-tn])`)) {
@@ -324,7 +387,15 @@ function scan() {
       if (!decisions.has(key)) {
         const now = Date.now();
         if (!posts.has(post.id)) mutate(p => T.observe(p, post, now));
-        decisions.set(key, decideHere(post, now));
+        const older = !onFollowing() && T.shadowFold(engine, shadow, post, pinned, now);
+        const decision = decideHere(post, now);
+        decisions.set(key, decision);
+        if (!onFollowing()) {
+          const auditKey = tabKey + '-' + audits.size;
+          audits.set(post.id, auditKey);
+          const flags = Number(older) | (settings.shapeFeed && (T.mutedBy(mutes, post) || decision.action === 'collapse') ? 2 : 0);
+          mutate(p => T.audit(p, auditKey, flags, true));
+        }
         posts.set(post.id, post);
 
       }
@@ -481,6 +552,20 @@ chrome.storage.onChanged.addListener((changes) => {
   }
   if (changes.settings || changes.mutes || changes.pinned) {
     for (const article of document.querySelectorAll(ARTICLE)) {
+      const id = article.closest('[data-id]')?.dataset.id;
+      const previous = decisions.get(keyOf(id));
+      if (changes.pinned && previous?.recent >= 3 && onFollowing()) {
+        const blog = posts.get(id).blog;
+        previous.action = pinned.includes(blog) ? 'show' : 'collapse';
+        previous.say = '@' + blog + ' has posted a lot in a row';
+      }
+      if (changes.pinned && previous?.before && !previous.byUser && !onFollowing()) {
+        const profile = structuredClone(engine);
+        profile.rr = profile.rr.filter(root => root !== (posts.get(id).root ?? id));
+        const state = previous.before;
+        const revised = T.decide(profile, { ...state, window: state.window.slice() }, posts.get(id), pinned, Date.now());
+        decisions.set(keyOf(id), { ...revised, before: state });
+      }
       article.querySelector('.tn-bar')?.remove();
       article.classList.remove('tn-collapsed');
       delete article.dataset.tn;
@@ -489,6 +574,12 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes.engine && !changes.engine.newValue) { pending = []; engine = T.emptyProfile(); } // reset from settings
   if (changes.unread) (unreadCount = changes.unread.newValue?.length ?? 0), updateAppButton();
   scan();
+  if (changes.settings || changes.pinned || changes.mutes) {
+    for (const article of inView) {
+      if (article.classList.contains('tn-collapsed')) pause(article, performance.now(), false);
+      else resume(article, performance.now());
+    }
+  }
 });
 
 chrome.storage.local.get({ engine: null, pinned, settings, unread: [], mutes: '' }).then((s) => {
