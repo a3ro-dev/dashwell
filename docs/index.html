@@ -166,9 +166,9 @@ table.cmp { width: 100%; border-collapse: collapse; font-size: 16px; font-varian
 .score .sum { margin: 0 0 22px; padding-top: 10px; border-top: 1px solid var(--line); font-weight: 700; font-size: 15px; }
 .band { display: flex; height: 38px; border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
 .band i { display: block; }
-.band .lo { flex: 15; background: repeating-linear-gradient(135deg, #ffffff2e 0 4px, transparent 4px 8px); }
-.band .mid { flex: 70; background: #ffffff0f; }
-.band .hi { flex: 15; background: #ffffff47; }
+.band .lo { flex: 20; background: repeating-linear-gradient(135deg, #ffffff2e 0 4px, transparent 4px 8px); }
+.band .mid { flex: 50; background: #ffffff0f; }
+.band .hi { flex: 30; background: #ffffff47; }
 .axis { display: flex; justify-content: space-between; margin: 6px 0 14px; font-size: 12.5px; color: var(--ink-2); }
 .key { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; color: var(--ink-2); }
 .key b { color: var(--ink); font-weight: 650; }
@@ -305,9 +305,9 @@ footer p { margin: 0; max-width: 60ch; }
   <section class="block how" id="how">
     <div class="wrap">
       <h2>how it decides what to fold</h2>
-      <p>it's not ai and it doesn't phone home. it's a small bit of javascript that runs on your device and keeps a note of the tags you scroll past, like and reblog.</p>
+      <p>it doesn't phone home. it's a small bit of javascript that runs on your device, keeps a note of the tags and blogs you scroll past, like and reblog, and since 1.3.0 learns a tiny model of what you actually do with posts. no server, no account, nothing uploaded.</p>
       <p>every topic gets a fair share of your dash based on what you've liked over months, not your last tap, so one like on something new gets maybe 2 posts in every 16 instead of your entire evening. if you keep scrolling past something it cools down for a bit, and if you like three posts about a new show in one go it figures that's a real new obsession and lets it in. it also works out that #black holes and #space are basically the same topic from how people tag things, which honestly was the fun part.</p>
-      <p>the maths comes from actual recommender research (calibrated recommendations, satiation, tie strength) and the whole thing is in <code>feed.js</code> if you want to read it.</p>
+      <p>the maths comes from actual recommender research (calibrated recommendations, satiation, tie strength, online learning, the value models x and instagram describe) and the whole thing is in <code>feed.js</code> if you want to read it.</p>
     </div>
   </section>
 
@@ -393,7 +393,7 @@ footer p { margin: 0; max-width: 60ch; }
           <li style="--i:0"><b>a post arrives</b><span>one at a time, as you scroll.</span></li>
           <li style="--i:1"><b>the quick checks</b><span>muted words, #tags and @blogs go first. repeat reblogs collapse. blogs you always like take the mutual fast lane and are never folded.</span></li>
           <li style="--i:2"><b>a learned value</b><span>three small guesses, made on your device: will you engage with it, will you read it, will you scroll past or hide it. they combine into one score. until it has seen enough of you it sticks to topic balance.</span></li>
-          <li style="--i:3"><b>the two ends</b><span>the posts at the bottom, about the lowest 15% by score, fold. the top 15% get past a full topic.</span></li>
+          <li style="--i:3"><b>the two ends</b><span>the posts at the bottom, about the lowest 20% by score, fold. the top 30% get past a full topic. now and then a folded one gets a second chance, so a bad week doesn't bury a topic for good.</span></li>
           <li style="--i:4"><b>topic balance and author limits</b><span>everything in between is shared out by your long-term interests, and no blog gets more than 2 posts in 16.</span></li>
           <li style="--i:5"><b>a line saying why</b><span>every fold explains itself: <q>You usually scroll past posts like this · Show</q>. tap show and it learns that too.</span></li>
         </ol>
@@ -406,12 +406,12 @@ footer p { margin: 0; max-width: 60ch; }
             <li class="neg">you'll scroll past or hide it<span class="sign" aria-hidden="true">−</span><span class="bartrack"><i style="width:28%"></i></span></li>
           </ul>
           <p class="sum">= one score</p>
-          <div class="band" role="img" aria-label="all posts ordered by score: the lowest 15% fold, the middle follows the usual topic limits, the top 15% get past a full topic"><i class="lo"></i><i class="mid"></i><i class="hi"></i></div>
+          <div class="band" role="img" aria-label="all posts ordered by score: the lowest 20% fold, the middle follows the usual topic limits, the top 30% get past a full topic"><i class="lo"></i><i class="mid"></i><i class="hi"></i></div>
           <div class="axis" aria-hidden="true"><span>lower score</span><span>higher score</span></div>
           <ul class="key">
-            <li><b>lowest 15%:</b> fold</li>
+            <li><b>lowest 20%:</b> fold</li>
             <li><b>the middle:</b> usual topic and author limits</li>
-            <li><b>top 15%:</b> can get past a full topic</li>
+            <li><b>top 30%:</b> can get past a full topic</li>
           </ul>
         </div>
       </div>
