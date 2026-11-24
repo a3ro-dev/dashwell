@@ -3,10 +3,25 @@
 Every Dashwell release, newest first. Downloads are on the
 [releases page](https://github.com/a3ro-dev/dashwell/releases). Updating keeps your login and settings.
 
-## Unreleased
+## 1.3.0 · 2026-11-24 · a feed that learns what you skip
 
-- A smarter feed engine is being tested: it learns what you scroll past, not just what you like,
-  so folds depend on how much you'd care about a post instead of only on how much of a topic you've seen.
+**New**
+- The feed now learns what you actually do with posts, not just what you like: what you read,
+  what you scroll straight past, what you hide. Posts you'd almost certainly skip fold with a reason
+  ("You usually scroll past posts like this · Show"); posts that are a strong match get through even
+  when their topic is busy.
+- Tag-stuffed spam (posts tagged with a pile of unrelated fandoms) folds.
+- Reblogs of a post you already saw stay folded across visits, not just within one.
+- "Less like this" lasts for weeks instead of half an hour.
+- Mutuals and blogs you always engage with are recognised faster and aren't folded for crowding.
+- Now and then a folded topic gets a second chance, so one bad week doesn't bury it.
+- Everything is still learned on your device. Nothing is uploaded.
+
+In our simulator with synthetic users, compared with 1.2.0: about 23% better picks, about a fifth more of
+the good posts shown, half as many posts wrongly hidden, half the spam, and posts from loved mutuals
+shown 96% of the time (was 87%). Simulated, so it compares engines rather than predicting your feed.
+
+Android: updates over the air from app 1.1.4 and later; your login, settings and learned feed carry over.
 
 ## 1.2.0 · 2026-11-22
 

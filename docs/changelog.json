@@ -1,5 +1,19 @@
 [
   {
+    "version": "1.3.0",
+    "date": "2026-11-24",
+    "title": "a feed that learns what you skip",
+    "items": [
+      "New: The feed now learns what you actually do with posts, not just what you like: what you read, what you scroll straight past, what you hide. Posts you'd almost certainly skip fold with a reason (\"You usually scroll past posts like this · Show\"); posts that are a strong match get through even when their topic is busy.",
+      "New: Tag-stuffed spam (posts tagged with a pile of unrelated fandoms) folds.",
+      "New: Reblogs of a post you already saw stay folded across visits, not just within one.",
+      "New: \"Less like this\" lasts for weeks instead of half an hour.",
+      "New: Mutuals and blogs you always engage with are recognised faster and aren't folded for crowding.",
+      "New: Now and then a folded topic gets a second chance, so one bad week doesn't bury it.",
+      "New: Everything is still learned on your device. Nothing is uploaded."
+    ]
+  },
+  {
     "version": "1.2.0",
     "date": "2026-11-22",
     "title": "",
